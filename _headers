@@ -1,0 +1,7 @@
+# Lar de andre fagsidene hente filene direkte, også som moduler
+/js/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300, must-revalidate
+
+/baner/*
+  Access-Control-Allow-Origin: *

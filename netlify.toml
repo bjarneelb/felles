@@ -1,0 +1,3 @@
+# Fellesrepo: felles filer for alle fagsidene
+[build]
+  publish = "."

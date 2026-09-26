@@ -1,3 +1,9 @@
-# Fellesrepo: felles filer for alle fagsidene
+# Fellesrepo: felles filer, baner og lærerside for alle fagsidene
 [build]
   publish = "."
+
+[functions]
+  directory = "netlify/functions"
+
+[build.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"

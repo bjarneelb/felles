@@ -120,6 +120,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .rapport-elev-name{font-weight:900;font-size:1rem;margin-bottom:4px;}
 .rapport-elev-stats{font-size:0.8rem;color:var(--muted);font-weight:600;margin-bottom:10px;}
 .rapport-text{font-size:0.88rem;line-height:1.6;color:var(--text);background:#f8f8ff;border-radius:8px;padding:12px;border-left:3px solid var(--accent);}
+.rapport-text.rapport-error{background:#fef2f2;border-left-color:var(--red);color:#991b1b;font-weight:700;}
 .rapport-loading{color:var(--muted);font-size:0.85rem;font-weight:700;font-style:italic;}
 
 /* MISC */
@@ -172,7 +173,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.4</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.5</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -894,14 +895,52 @@ Skriv tilsvarende 3-4 setninger i tredje person om ${name}. Husk:
       body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:350,
         messages:[{role:'user',content:prompt}]})
     });
-    const data=await resp.json();
-    const text=data.content?.[0]?.text||'Kunne ikke generere vurdering.';
+    const raw=await resp.text();
+    let data=null;
+    try{ data=JSON.parse(raw); }catch(e){}
+    const text=data&&data.content&&data.content[0]&&data.content[0].text;
     const el=document.getElementById(elId);
-    if(el){el.className='rapport-text';el.textContent=text;}
+    if(!el) return;
+    if(resp.ok&&text){
+      el.className='rapport-text';
+      el.textContent=text;
+    } else {
+      el.className='rapport-text rapport-error';
+      el.textContent='⚠️ Kunne ikke lage vurdering. '+explainAiError(resp.status,data,raw);
+    }
   }catch(e){
     const el=document.getElementById(elId);
-    if(el){el.className='rapport-text';el.textContent='Feil ved generering.';}
+    if(el){
+      el.className='rapport-text rapport-error';
+      el.textContent='⚠️ Fikk ikke kontakt med AI-tjenesten. Sjekk nettverket og prøv igjen. ('+e.message+')';
+    }
   }
+}
+
+// Gjør feilsvar fra ai-proxy/Anthropic om til en forklaring læreren kan handle på
+function explainAiError(status,data,raw){
+  const err=data&&data.error;
+  const type=(err&&typeof err==='object'&&err.type)||'';
+  const msg=(err&&typeof err==='object'&&err.message)||(typeof err==='string'?err:'')||(raw||'').slice(0,200);
+  if(status===404)
+    return 'Fant ikke ai-proxy-funksjonen på denne siden. Sjekk at netlify/functions/ai-proxy.js er lastet opp, og deploy siden på nytt.';
+  if(status===401||type==='authentication_error')
+    return 'API-nøkkelen mangler eller er feil. Legg inn likningsspill_key i Netlify for denne siden (med scope «Functions»), og deploy på nytt.';
+  if(status===403||type==='permission_error')
+    return 'API-nøkkelen har ikke tilgang til modellen. Sjekk nøkkelen i Anthropic-kontoen.';
+  if(/credit balance/i.test(msg))
+    return 'Anthropic-kontoen er tom for kreditt. Fyll på i Anthropic-konsollen.';
+  if(status===429||type==='rate_limit_error')
+    return 'For mange forespørsler på kort tid. Vent et minutt og prøv igjen, gjerne med færre elever om gangen.';
+  if(status===529||type==='overloaded_error')
+    return 'AI-tjenesten er overbelastet akkurat nå. Prøv igjen om litt.';
+  if(status===400||type==='invalid_request_error')
+    return 'Forespørselen ble avvist: '+msg;
+  if(status>=500)
+    return 'Feil i ai-proxy eller hos AI-tjenesten (kode '+status+'): '+msg;
+  if(status===200)
+    return 'AI-tjenesten svarte, men uten tekst. Prøv igjen.';
+  return 'Feilkode '+status+': '+msg;
 }
 
 // ── TOAST ──

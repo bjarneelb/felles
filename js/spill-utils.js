@@ -1,4 +1,4 @@
-// ── spill-utils.js v2.0 ──
+// ── spill-utils.js v2.1 ──
 // Felles hjelpefunksjoner for alle fagsider og spill.
 //
 // VIKTIG: Lastes i <head>, FØR spillets egen kode:
@@ -161,8 +161,13 @@ function buildLevelSelect(){
 function selectMode(mode){
   gameMode=mode;
   document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  // Nyere spill: én boks med id="multiOpts"
   const mo=document.getElementById('multiOpts');
   if(mo) mo.style.display=mode==='multi'?'block':'none';
+  // Eldre spill: én boks per modus med id="opts-<modus>" og klassen .mode-options
+  document.querySelectorAll('.mode-options[id^="opts-"]').forEach(el=>{
+    el.classList.toggle('visible',el.id==='opts-'+mode);
+  });
 }
 
 // ── ADAPTIV NIVÅJUSTERING (krever currentLevel, MIN_LEVEL, MAX_LEVEL, LEVELS, streak, errorStreak) ──

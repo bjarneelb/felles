@@ -131,6 +131,23 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);
   display:none;align-items:center;justify-content:center;
   flex-direction:column;background:rgba(6,12,24,0.95);}
 #winOverlay.show{display:flex;}
+/* Målvisning og kampoppsummering */
+#goalBanner{position:absolute;left:50%;top:18%;transform:translate(-50%,-10px) scale(0.9);z-index:150;pointer-events:none;
+  opacity:0;transition:opacity .3s,transform .3s;text-align:center;background:rgba(6,12,24,0.88);border:2px solid var(--yellow);
+  border-radius:16px;padding:14px 28px;box-shadow:0 0 40px rgba(255,215,0,0.35);}
+#goalBanner.show{opacity:1;transform:translate(-50%,0) scale(1);}
+#goalBanner .gb-title{font-family:'Black Han Sans',sans-serif;font-size:2.6rem;color:var(--yellow);letter-spacing:4px;line-height:1.1;}
+#goalBanner .gb-who{font-size:1.25rem;font-weight:800;color:white;margin-top:4px;}
+#goalBanner .gb-team{font-size:0.85rem;font-weight:700;opacity:0.85;margin-top:2px;}
+.win-mvp{background:rgba(255,215,0,0.12);border:2px solid var(--yellow);border-radius:14px;padding:10px 22px;margin:4px 0 14px;text-align:center;}
+.win-mvp .mvp-lbl{font-size:0.75rem;letter-spacing:3px;color:var(--yellow);font-weight:800;}
+.win-mvp .mvp-name{font-family:'Black Han Sans',sans-serif;font-size:1.8rem;color:white;letter-spacing:2px;}
+.win-mvp .mvp-info{font-size:0.85rem;color:rgba(255,255,255,0.8);font-weight:700;}
+.win-scorers{display:flex;gap:28px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;max-width:90%;}
+.win-scorers .ws-team{min-width:180px;text-align:center;}
+.win-scorers .ws-title{font-size:0.8rem;font-weight:800;letter-spacing:2px;margin-bottom:4px;}
+.win-scorers .ws-goal{font-size:0.95rem;color:white;font-weight:700;line-height:1.6;}
+.win-scorers .ws-none{font-size:0.85rem;color:rgba(255,255,255,0.5);font-style:italic;}
 .win-trophy{font-size:5rem;margin-bottom:8px;}
 .win-title{font-family:'Black Han Sans',sans-serif;font-size:2.5rem;
   color:var(--yellow);letter-spacing:4px;margin-bottom:6px;}
@@ -145,7 +162,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);
   <div class="setup-card">
     <h1>⚽ MATTEFOTBALL</h1>
     <p id="setupSubtitle">Opprett rom og la elevene koble til</p>
-    <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--muted);margin-bottom:12px">v0.918</div>
+    <div style="font-family:var(--font-mono);font-size:0.65rem;color:var(--muted);margin-bottom:12px">v0.920</div>
 
     <!-- STEG 1: Opprett rom -->
     <div id="step1">
@@ -202,6 +219,8 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);
   <div class="win-trophy">🏆</div>
   <div class="win-title" id="winTitle">VINNER!</div>
   <div class="win-score" id="winScore">2 – 1</div>
+  <div class="win-mvp" id="winMvp" style="display:none"></div>
+  <div class="win-scorers" id="winScorers"></div>
   <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;justify-content:center">
     <button class="btn-primary" style="width:180px" onclick="location.reload()">🔄 Ny kamp</button>
     <button class="btn-primary" style="width:180px;background:#16a34a;border-color:#16a34a" onclick="goToMenu()">🏠 Tilbake til meny</button>
@@ -237,6 +256,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);
   <!-- PITCH -->
   <div class="canvas-wrap">
     <canvas id="pitch"></canvas>
+    <div id="goalBanner" aria-live="polite"><div class="gb-title">⚽ MÅL!</div><div class="gb-who" id="gbWho"></div><div class="gb-team" id="gbTeam"></div></div>
     <div id="countdownOverlay" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:200;background:rgba(6,12,24,0.7)">
       <div id="countdownNum" style="font-family:'Black Han Sans',sans-serif;font-size:7rem;color:var(--yellow);text-shadow:0 0 40px rgba(255,215,0,0.8)"></div>
     </div>
@@ -375,7 +395,7 @@ window.launchMatch=function(){
   document.getElementById('setupOverlay').style.display='none';
   document.getElementById('startBtn').disabled=false;
   document.getElementById('whistleBtn').disabled=false;
-  scores={};
+  scores={}; goals=[]; lastShooter=null;
   Object.keys(teams).forEach(t=>{scores[t]=0;});
   updateScoreDisplay();
   updateTimerDisplay();
@@ -432,7 +452,7 @@ function initFootballers(){
     });
   });
   ball.x=PW/2; ball.y=PH/2; ball.vx=0; ball.vy=0;
-  ballCarrier=null; carryTimer=0; nextActionTime=0;
+  ballCarrier=null; carryTimer=0; nextActionTime=0; pass=null;
   recentlyPassedFrom=null; recentlyPassedTimer=0;
   // Gi ballen til midtbanespiller fra LAG A
   const kp=footballers.find(f=>f.team===TEAM_NAMES[0]&&f.role==='mid');
@@ -599,7 +619,7 @@ function triggerHalftime(){
   setTimeout(()=>{
     document.getElementById('halftimeOverlay').style.display='none';
     document.getElementById('halfBadge').textContent='2. OMGANG';
-    ball.x=PW/2; ball.y=PH/2; ball.vx=0; ball.vy=0; ballCarrier=null;
+    ball.x=PW/2; ball.y=PH/2; ball.vx=0; ball.vy=0; ballCarrier=null; pass=null;
     initFootballers(); // reset positions with swapped sides
     startCountdown(()=>{gameRunning=true;gamePaused=false;});
   },5000);
@@ -609,12 +629,13 @@ function endMatch(){
   gameRunning=false;
   document.getElementById('winTitle').textContent=winnerText();
   document.getElementById('winScore').textContent=scoreStr();
+  const mvp=renderMatchSummary();
   document.getElementById('winOverlay').style.display='flex';
   // Notify players via Firebase that match is over
   if(window._fbReady&&roomCode){
     window._update(window._ref(window._db,'rooms/'+roomCode),{
       matchOver:true, matchOverAt:Date.now(),
-      result:winnerText()+' '+scoreStr()
+      result:winnerText()+' '+scoreStr()+(mvp?' · ⭐ Kampens beste spiller: '+mvp.name:'')
     });
   }
 }
@@ -671,6 +692,12 @@ const GOAL_W=90, GOAL_DEPTH=14;
 
 // Tidsstyrt: sett neste beslutning som et fast tidspunkt
 const MIN_CARRY=0.8, MAX_CARRY=2.2;
+// Pasninger: ballen flyr synlig mot mottakeren (før stoppet den etter noen få piksler og «hoppet»)
+const PASS_SPEED_FACTOR=0.35;   // banebredder per sekund — en pasning over halve banen tar halvannet sekund
+const INTERCEPT_DIST=13;        // motstander så nær ballbanen kan snappe pasningen
+let pass=null;                  // {toId, fromTeam, speed, total, done}
+let lastShooter=null;           // spilleren som skjøt sist (for å vite hvem som scoret)
+let goals=[];                   // [{name, team, isAI, own, min}]
 let carryTimer=0;
 let nextActionTime=0; // sekunder — når bæreren skal handle neste gang
 let blockedPlayerId=null;  // spiller-id som ikke kan plukke opp
@@ -684,7 +711,31 @@ function updatePhysics(dt){
     if(blockTimer<=0){ blockedPlayerId=null; blockedTeamName=null; }
   }
 
-  if(ballCarrier!==null){
+  if(ballCarrier===null&&pass){
+    const to=footballers.find(f=>f.id===pass.toId);
+    if(!to){ pass=null; }
+    else {
+      const dx=to.x-ball.x, dy=to.y-ball.y, d=Math.hypot(dx,dy)||1;
+      const step=pass.speed*dt;
+      if(d<=Math.max(step,10)){
+        // Mottakeren tar imot ballen
+        ball.x=to.x; ball.y=to.y; pass=null;
+        ballCarrier=to.id; carryTimer=0;
+        nextActionTime=to.role==='keeper'?0.2:MIN_CARRY+Math.random()*(MAX_CARRY-MIN_CARRY);
+      } else {
+        ball.x+=dx/d*step; ball.y+=dy/d*step; pass.done+=step;
+        // En motstander nær ballbanen kan snappe den (ikke de første metrene, og ikke laget som er sperret)
+        if(pass.done>30){
+          const opp=footballers.find(f=>f.team!==pass.fromTeam&&f.team!==blockedTeamName&&f.role!=='keeper'&&
+            Math.hypot(f.x-ball.x,f.y-ball.y)<INTERCEPT_DIST);
+          if(opp){
+            pass=null; ballCarrier=opp.id; carryTimer=0;
+            nextActionTime=MIN_CARRY+Math.random()*(MAX_CARRY-MIN_CARRY);
+          }
+        }
+      }
+    }
+  } else if(ballCarrier!==null){
     const carrier=footballers.find(f=>f.id===ballCarrier);
     if(!carrier){ ballCarrier=null; nextActionTime=0; }
     else {
@@ -719,7 +770,7 @@ function updatePhysics(dt){
     });
     if(nearest){
       console.log('PICKUP: '+nearest.name+'(id='+nearest.id+') team='+nearest.team+' dist='+Math.round(nearDist)+' | blockedId='+blockedPlayerId+' blockedTeam="'+blockedTeamName+'" teams='+JSON.stringify(Object.keys(teams)));
-      ballCarrier=nearest.id; carryTimer=0;
+      ballCarrier=nearest.id; carryTimer=0; lastShooter=null;
       nextActionTime=nearest.role==='keeper'?0.2:MIN_CARRY+Math.random()*(MAX_CARRY-MIN_CARRY);
     }
   }
@@ -825,7 +876,14 @@ function doCarrierAction(carrier){
   // Foretrekk spillere minst 25% av banen fremover
   const longForward=teammates.filter(ff=>attackRight?ff.x>carrier.x+PW*0.25:ff.x<carrier.x-PW*0.25);
   const shortForward=teammates.filter(ff=>attackRight?ff.x>carrier.x+30:ff.x<carrier.x-30);
-  const candidates=longForward.length>=1?longForward:(shortForward.length>=1?shortForward:teammates);
+  // Lange pasninger også på tvers og litt bakover, ikke bare til den som står helt inntil
+  const dist=ff=>Math.hypot(ff.x-carrier.x,ff.y-carrier.y);
+  const longAny=teammates.filter(ff=>dist(ff)>=PW*0.2&&(attackRight?ff.x>carrier.x-PW*0.1:ff.x<carrier.x+PW*0.1));
+  const notTooClose=teammates.filter(ff=>dist(ff)>=PW*0.1);
+  const pool=Math.random()<0.6?longForward:longAny;
+  const candidates=pool.length?pool:longForward.length?longForward:longAny.length?longAny:
+    shortForward.filter(ff=>dist(ff)>=PW*0.1).length?shortForward.filter(ff=>dist(ff)>=PW*0.1):
+    notTooClose.length?notTooClose:(shortForward.length?shortForward:teammates);
 
   if(candidates.length>0){
     const t=candidates[Math.floor(Math.random()*candidates.length)];
@@ -840,17 +898,18 @@ function passTo(from,to){
   if(!blockedTeamName) blockedTeamName=null;
   blockTimer=4.0;
   ballCarrier=null; carryTimer=0; nextActionTime=99;
-  const dx=to.x-from.x, dy=to.y-from.y, dist=Math.hypot(dx,dy)||1;
-  const spd=BALL_SPEED*(0.85+(from.energy||1)*0.3);
-  const inaccuracy=(1.1-(from.energy||1))*35;
-  ball.vx=(dx/dist)*spd+(Math.random()-0.5)*inaccuracy;
-  ball.vy=(dy/dist)*spd+(Math.random()-0.5)*inaccuracy;
+  const dist=Math.hypot(to.x-from.x,to.y-from.y)||1;
+  // Spillere med mye energi slår litt hardere pasninger
+  const spd=Math.max(220,PW*PASS_SPEED_FACTOR)*(0.85+(from.energy||1)*0.25);
+  ball.vx=0; ball.vy=0;
   ball.x=from.x;
   ball.y=from.y;
+  pass={toId:to.id, fromTeam:from.team, speed:spd, total:dist, done:0};
   console.log('PASS from '+from.name+' to '+to.name+' ball='+Math.round(ball.x)+','+Math.round(ball.y));
 }
 
 function shoot(f){
+  lastShooter=f;
   blockedPlayerId=f.id;
   blockedTeamName=null;
   blockTimer=1.0;
@@ -894,6 +953,9 @@ function getTarget(f, hasBall){
     const clampY=Math.max(PH/2-GOAL_W/2+10, Math.min(PH/2+GOAL_W/2-10, ball.y));
     return {x: myGoalX + (attackRight?10:-10), y: clampY};
   }
+
+  // Mottakeren av en pasning løper mot ballen
+  if(pass&&pass.toId===f.id) return {x:ball.x, y:ball.y};
 
   // Bæreren: løp mot motstanders mål med litt wander
   if(hasBall){
@@ -949,8 +1011,9 @@ function goalScored(side){
   if(scoringTeam && scores[scoringTeam]!==undefined){
     scores[scoringTeam]++;
     updateScoreDisplay();
+    registerGoal(scoringTeam);
     // Reset ball og flytt spillere til startposisjon
-    ball.x=PW/2; ball.y=PH/2; ball.vx=0; ball.vy=0; ballCarrier=null;
+    ball.x=PW/2; ball.y=PH/2; ball.vx=0; ball.vy=0; ballCarrier=null; pass=null;
     footballers.forEach((f,i)=>{
       const sameRole=footballers.filter(ff=>ff.team===f.team&&ff.role===f.role);
       const idx=sameRole.indexOf(f);
@@ -961,6 +1024,61 @@ function goalScored(side){
     if(window._fbReady&&roomCode)
       window._update(window._ref(window._db,'rooms/'+roomCode),{scores:JSON.stringify(scores)});
   }
+}
+
+// Hvem scoret? Den som skjøt sist, hvis det var en på laget som fikk målet
+function registerGoal(team){
+  const sh=lastShooter; lastShooter=null;
+  const played=Math.max(0,totalMatchTime-matchTimeLeft);
+  const g={team, min:Math.floor(played/60)+1, name:null, isAI:false, own:false};
+  if(sh&&sh.team===team){ g.name=sh.name; g.isAI=!!sh.isAI||/^AI-/.test(sh.name); }
+  else if(sh){ g.own=true; g.name=sh.name; g.isAI=!!sh.isAI||/^AI-/.test(sh.name); }
+  goals.push(g);
+  showGoalBanner(g);
+}
+function scorerLabel(g){
+  if(g.own) return 'selvmål'+(g.isAI||!g.name?'':' ('+g.name+')');
+  if(!g.name||g.isAI) return 'datamaskinspiller';
+  return g.name;
+}
+let goalBannerTimer=null;
+function showGoalBanner(g){
+  const el=document.getElementById('goalBanner'); if(!el) return;
+  const idx=Object.keys(teams).indexOf(g.team);
+  document.getElementById('gbWho').textContent=g.own?'Selvmål':(!g.name||g.isAI?'Datamaskinspiller':g.name);
+  const t=document.getElementById('gbTeam');
+  t.textContent=g.team+' · '+g.min+'. minutt';
+  t.style.color=TEAM_COLORS[idx]||'white';
+  el.classList.add('show');
+  clearTimeout(goalBannerTimer);
+  goalBannerTimer=setTimeout(()=>el.classList.remove('show'),3500);
+}
+// Kampens beste spiller: flest poeng fra oppgavene (mål teller ved likt)
+function bestPlayer(){
+  const goalsBy={}; goals.forEach(g=>{ if(!g.own&&g.name&&!g.isAI) goalsBy[g.name]=(goalsBy[g.name]||0)+1; });
+  const names=Object.values(teams).flat().filter(n=>players[n]);
+  if(!names.length) return null;
+  names.sort((a,b)=>((players[b].score||0)-(players[a].score||0))||((goalsBy[b]||0)-(goalsBy[a]||0)));
+  const n=names[0];
+  if(!(players[n].score>0)&&!goalsBy[n]) return null;
+  return {name:n, score:players[n].score||0, goals:goalsBy[n]||0,
+    team:Object.keys(teams).find(t=>teams[t].includes(n))};
+}
+function renderMatchSummary(){
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const mvp=bestPlayer(), mEl=document.getElementById('winMvp');
+  if(mvp){
+    mEl.style.display='';
+    mEl.innerHTML=`<div class="mvp-lbl">⭐ KAMPENS BESTE SPILLER</div><div class="mvp-name">${esc(mvp.name)}</div>`+
+      `<div class="mvp-info">${esc(mvp.team||'')} · ${mvp.score} poeng${mvp.goals?' · '+mvp.goals+' mål':''}</div>`;
+  } else mEl.style.display='none';
+  document.getElementById('winScorers').innerHTML=Object.keys(teams).map((t,i)=>{
+    const tg=goals.filter(g=>g.team===t);
+    return `<div class="ws-team"><div class="ws-title" style="color:${TEAM_COLORS[i]}">${esc(t)}</div>`+
+      (tg.length?tg.map(g=>`<div class="ws-goal">⚽ ${esc(scorerLabel(g))} <span style="opacity:.6">${g.min}'</span></div>`).join('')
+        :'<div class="ws-none">Ingen mål</div>')+'</div>';
+  }).join('');
+  return mvp;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1057,11 +1175,17 @@ function drawFootballers(){
 
 function drawBall(){
   if(!ctx) return;
+  // Løft under pasning: høyest midt i ballbanen, mer løft på lange pasninger
+  let lift=0;
+  if(pass&&pass.total>0){
+    const t=Math.min(1,pass.done/Math.max(pass.total,1));
+    lift=Math.sin(Math.PI*t)*Math.min(22,pass.total*0.06);
+  }
   // Shadow
-  ctx.beginPath(); ctx.ellipse(ball.x+2,ball.y+3,7,5,0,0,Math.PI*2);
-  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(ball.x+2+lift*0.3,ball.y+3+lift*0.5,7-lift*0.08,5-lift*0.06,0,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,0,0,'+(0.3-lift*0.006)+')'; ctx.fill();
   // Ball
-  ctx.beginPath(); ctx.arc(ball.x,ball.y,7,0,Math.PI*2);
+  ctx.beginPath(); ctx.arc(ball.x,ball.y-lift,7+lift*0.12,0,Math.PI*2);
   ctx.fillStyle='#f0f0f0'; ctx.fill();
   ctx.strokeStyle='#333'; ctx.lineWidth=1; ctx.stroke();
 }

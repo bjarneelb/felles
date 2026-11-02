@@ -1,4 +1,4 @@
-// ── spill-utils.js v2.1 ──
+// ── spill-utils.js v2.2 ──
 // Felles hjelpefunksjoner for alle fagsider og spill.
 //
 // VIKTIG: Lastes i <head>, FØR spillets egen kode:
@@ -187,7 +187,79 @@ function changeLevel(d){
   document.querySelectorAll('.level-btn').forEach(b=>b.classList.toggle('active',parseInt(b.textContent,10)===currentLevel));
 }
 
+// ── SPILLERNAVN OG MENYKNAPP PÅ SKJERMEN ──
+// Legges inn automatisk i alle spill som laster denne fila (ikke på menysidene).
+// - Spillernavnet (f.eks. 🐾 Gaupe20) vises i topplinjen og på startskjermen.
+// - Spill som mangler en knapp tilbake til menyen, får en.
+// En side kan slå dette av med <body data-su-chrome="off">.
+function menuHref(){
+  const depth=location.pathname.replace(/^\/+/,'').split('/').length-1;
+  return depth>0?'../'.repeat(depth):'./';
+}
+function isMenuPage(){
+  const p=location.pathname;
+  return p.endsWith('/')||/\/index\.html?$/i.test(p)||(document.body&&document.body.dataset.suChrome==='off');
+}
+function suEsc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function addPlayerChrome(){
+  if(isMenuPage()) return;
+  // Smale skjermer: la topplinjen bryte over flere linjer, så ingenting havner utenfor skjermen
+  if(!document.getElementById('su-chrome-css')){
+    const st=document.createElement('style');
+    st.id='su-chrome-css';
+    st.textContent='@media (max-width:700px){'+
+      '.header{flex-wrap:wrap!important;row-gap:6px;height:auto!important;}'+
+      '.header-right{flex-wrap:wrap!important;justify-content:flex-end;row-gap:5px;min-width:0;max-width:100%;}'+
+      '.header .version-tag{display:none!important;}}';
+    document.head.appendChild(st);
+  }
+  const name=window.playerName||'';
+  const header=document.querySelector('.header-right')||document.querySelector('.header')||document.querySelector('header');
+  const chipCss='display:inline-flex;align-items:center;gap:4px;padding:3px 12px;border-radius:20px;font-size:0.8rem;'+
+    'font-weight:800;background:rgba(255,255,255,0.92);color:#1e293b;border:1px solid rgba(0,0,0,0.08);white-space:nowrap;font-family:inherit;';
+  // 1) Spillernavn i topplinjen (eldre spill med #headerName viser det allerede, men først etter start)
+  const hn=document.getElementById('headerName');
+  if(hn&&name&&/^[\s–-]*$/.test(hn.textContent)) hn.textContent=name;
+  if(name&&!document.getElementById('headerName')&&!document.querySelector('.su-player')){
+    const chip=document.createElement('span');
+    chip.className='su-player';
+    chip.title='Spillernavnet ditt';
+    chip.textContent='🐾 '+name;
+    chip.style.cssText=chipCss;
+    if(header){
+      const rb=document.getElementById('roomBadge');
+      if(rb&&rb.parentNode===header) header.insertBefore(chip,rb); else header.insertBefore(chip,header.firstChild);
+    } else {
+      chip.style.cssText+='position:fixed;bottom:10px;left:10px;z-index:150;box-shadow:0 2px 8px rgba(0,0,0,0.15);';
+      document.body.appendChild(chip);
+    }
+  }
+  // 2) «Du spiller som …» på startskjermen (eldre spill med #displayName viser det allerede)
+  const card=document.querySelector('#startScreen .start-card, #lobbyScreen .screen-card');
+  if(name&&card&&!document.getElementById('displayName')&&!card.querySelector('.su-player-start')){
+    const d=document.createElement('div');
+    d.className='su-player-start';
+    d.style.cssText='margin:0 0 14px;font-weight:800;font-size:0.9rem;color:#475569;';
+    d.innerHTML='Du spiller som <span style="display:inline-block;padding:2px 12px;border-radius:20px;background:#f1f5f9;color:#1e293b;border:1px solid #e2e8f0">🐾 '+suEsc(name)+'</span>';
+    const p=card.querySelector('p');
+    if(p&&p.parentNode===card) p.after(d); else card.insertBefore(d,card.firstChild);
+  }
+  // 3) Knapp tilbake til menyen, hvis spillet ikke har en
+  const hasMenu=[...document.querySelectorAll('a')].some(a=>/meny/i.test(a.textContent));
+  if(!hasMenu){
+    const a=document.createElement('a');
+    a.className='su-menu';
+    a.href=menuHref();
+    a.textContent='← Meny';
+    a.style.cssText=chipCss+'text-decoration:none;cursor:pointer;';
+    if(header) header.appendChild(a);
+    else { a.style.cssText+='position:fixed;top:10px;left:10px;z-index:150;box-shadow:0 2px 8px rgba(0,0,0,0.15);'; document.body.appendChild(a); }
+  }
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',addPlayerChrome);
+else addPlayerChrome();
+
 // Originalene, så spill som lager egne versjoner fortsatt kan bruke dem
 window.SU={generateNickname,readSession,getActiveSession,getNickname,whenFb,syncToTimecode,syncToTimecodeGeneric,
   levelTracker,initRoom,syncRoomScore,showMatchOverToast,showToast,getRoomBadgeHTML,buildLevelSelect,selectMode,
-  recordResult,changeLevel};
+  recordResult,changeLevel,addPlayerChrome,menuHref};

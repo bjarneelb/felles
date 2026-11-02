@@ -25,6 +25,8 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .login-input:focus{border-color:var(--accent);}
 .btn-login{width:100%;padding:13px;background:var(--accent);color:white;border:2px solid var(--accent);border-radius:12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:1rem;cursor:pointer;transition:background 0.2s;}
 .btn-login:hover{background:#4338ca;border-color:#4338ca;}
+.login-remember{display:flex;align-items:center;justify-content:center;gap:8px;font-size:0.85rem;font-weight:700;color:var(--muted);margin:-4px 0 14px;cursor:pointer;}
+.login-remember input{width:16px;height:16px;accent-color:var(--accent);}
 .login-error{color:var(--red);font-size:0.85rem;font-weight:700;margin-top:10px;display:none;}
 
 /* HEADER */
@@ -165,15 +167,20 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
     <div class="login-icon">🔐</div>
     <h1>Lærerside</h1>
     <p>Logg inn for å administrere spillrom</p>
-    <input class="login-input" type="password" id="passwordInput" placeholder="Passord"
-      onkeydown="if(event.key==='Enter') doLogin()">
-    <button class="btn-login" onclick="window.doLogin()">Logg inn</button>
+    <!-- Et ekte skjema, slik at nettleseren (f.eks. Google passordlagring) kan lagre og fylle ut passordet -->
+    <form id="loginForm" action="#" method="post" autocomplete="on" onsubmit="event.preventDefault();window.doLogin();">
+      <input type="text" name="username" autocomplete="username" value="Lærer" readonly
+        style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" tabindex="-1" aria-hidden="true">
+      <input class="login-input" type="password" id="passwordInput" name="password" autocomplete="current-password" placeholder="Passord" required>
+      <label class="login-remember"><input type="checkbox" id="rememberMe"> Husk meg på denne maskinen i 30 dager</label>
+      <button class="btn-login" type="submit">Logg inn</button>
+    </form>
     <div class="login-error" id="loginError">Feil passord – prøv igjen</div>
   </div>
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.6</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.8</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -298,9 +305,20 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 <script>
 // ── AUTH ──
 const SESSION_KEY='teacher_auth_v1';
+const REMEMBER_KEY='teacher_remember_v1';           // «Husk meg»: utløpstid lagret på denne maskinen
+const REMEMBER_DAYS=30;
 const PW_HASH='cf136f81c10d80345b81648ca0dda7c2b6e59b43f9e3e6eba358984f983be0ac';
 
-if(sessionStorage.getItem(SESSION_KEY)==='true'){
+function rememberedLogin(){
+  try{
+    const r=JSON.parse(localStorage.getItem(REMEMBER_KEY)||'null');
+    if(r&&r.hash===PW_HASH&&r.until>Date.now()) return true;
+    localStorage.removeItem(REMEMBER_KEY);
+  }catch(e){}
+  return false;
+}
+if(sessionStorage.getItem(SESSION_KEY)==='true'||rememberedLogin()){
+  sessionStorage.setItem(SESSION_KEY,'true');
   document.getElementById('loginScreen').style.display='none';
   waitForFirebase();
 }
@@ -323,6 +341,11 @@ window.doLogin=async function(){
     const hash=await hashPassword(pw);
     if(hash===PW_HASH||pw===PW_HASH){
       sessionStorage.setItem(SESSION_KEY,'true');
+      try{
+        if(document.getElementById('rememberMe').checked)
+          localStorage.setItem(REMEMBER_KEY,JSON.stringify({hash:PW_HASH,until:Date.now()+REMEMBER_DAYS*864e5}));
+        else localStorage.removeItem(REMEMBER_KEY);
+      }catch(e){}
       document.getElementById('loginScreen').style.display='none';
       waitForFirebase();
     } else {
@@ -335,6 +358,7 @@ window.doLogin=async function(){
 };
 function doLogout(){
   sessionStorage.removeItem(SESSION_KEY);
+  try{ localStorage.removeItem(REMEMBER_KEY); }catch(e){}
   location.reload();
 }
 
@@ -736,6 +760,28 @@ const GAME_LEVELS={
   },
   'koordinatslag':{
     0:'koordinatslag (skyte på koordinater i et koordinatsystem)',
+  },
+  'areal-ruter':{
+    1:'telle ruter for å finne arealet av en figur',
+    2:'merke av rektangler og kvadrater med et gitt areal på rutenett',
+    3:'finne lengde og bredde på rutenett og regne ut areal som lengde · bredde',
+    4:'telle hele og halve ruter for å finne arealet',
+    5:'finne grunnlinje, høyde og areal av trekant, parallellogram og trapes på rutenett',
+    6:'finne arealet av sammensatte figurer på rutenett',
+  },
+  'areal-regn':{
+    1:'regne ut arealet av rektangel og kvadrat med hele tall',
+    2:'regne ut arealet av rektangel og kvadrat med desimaltall',
+    3:'regne ut arealet av trekanter med grunnlinje og høyde',
+    4:'regne ut arealet av parallellogram',
+    5:'regne ut arealet av rombe med diagonalene',
+    6:'regne ut arealet av trapes',
+    7:'regne ut arealet av sirkel med π ≈ 3,14',
+    8:'regne ut arealet av blandede figurer, der noen mål ikke skal brukes',
+    9:'finne et manglende mål når arealet er kjent',
+    10:'regne ut arealet av sammensatte figurer med to deler',
+    11:'regne ut arealet av sammensatte figurer med hull og flere deler',
+    12:'regne ut areal med blandede enheter (mm, cm, dm, m) og gjøre om arealenheter',
   },
 };
 

@@ -180,7 +180,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.8</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.9</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -572,10 +572,51 @@ function formatAgo(ms){
   return h+'t siden';
 }
 
+// ── AUTOMATISK OPPRYDDING ──
+// Rom uten aktivitet de siste 3 timene slettes. Det skjer når lærersiden åpnes,
+// og hvert femte minutt mens den er åpen.
+const ROOM_MAX_IDLE=3*36e5;
+const ROOM_CLEANUP_EVERY=5*60e3;
+// Siste tegn til liv i et rom: spillere, avspark, nedtelling, kampslutt eller opprettelse
+function roomLastActivity(room){
+  let t=0;
+  const bump=v=>{ if(typeof v==='number'&&v>t) t=v; };
+  Object.values(room.players||{}).forEach(p=>{ if(p) bump(p.lastUpdated); });
+  [room.matchOverAt,room.kickoff,room.countdown,room.seenAt,room.createdAt,room.lastUpdated].forEach(bump);
+  if(room.meta){ bump(room.meta.created); bump(room.meta.createdAt); }
+  return t;
+}
+function cleanupOldRooms(){
+  if(!window._fbReady) return;
+  const now=Date.now();
+  let removed=0;
+  Object.entries(roomsData).forEach(([code,room])=>{
+    if(!room||typeof room!=='object') return;
+    const t=roomLastActivity(room);
+    if(!t){
+      // Rom uten tidsstempel (f.eks. Koordinatslag): merk det nå, så kan det slettes senere
+      window._update(window._ref(window._db,'rooms/'+code),{seenAt:now});
+      return;
+    }
+    if(now-t>ROOM_MAX_IDLE){
+      window._remove(window._ref(window._db,'rooms/'+code));
+      selectedRooms.delete(code); openRooms.delete(code);
+      removed++;
+    }
+  });
+  if(removed) showToast('🧹 '+removed+' gamle rom ble slettet (ingen aktivitet på 3 timer)','success');
+}
+
+let roomCleanupStarted=false;
 function loadRooms(){
   window._onValue(window._ref(window._db,'rooms'),snap=>{
     roomsData=snap.val()||{};
     renderRooms();
+    if(!roomCleanupStarted){
+      roomCleanupStarted=true;
+      cleanupOldRooms();
+      setInterval(cleanupOldRooms,ROOM_CLEANUP_EVERY);
+    }
   });
 }
 
@@ -587,11 +628,7 @@ function renderRooms(){
     el.innerHTML='<div class="empty-state"><div class="icon">🎮</div><p>Ingen aktive spillrom</p></div>';
     return;
   }
-  const sorted=codes.sort((a,b)=>{
-    const la=Object.values(roomsData[a].players||{}).reduce((t,p)=>Math.max(t,p.lastUpdated||0),0);
-    const lb=Object.values(roomsData[b].players||{}).reduce((t,p)=>Math.max(t,p.lastUpdated||0),0);
-    return lb-la;
-  });
+  const sorted=codes.sort((a,b)=>roomLastActivity(roomsData[b])-roomLastActivity(roomsData[a]));
   el.innerHTML=sorted.map(code=>renderRoomCard(code,roomsData[code])).join('');
 }
 
@@ -601,15 +638,16 @@ function renderRoomCard(code,room){
   const isOpen=openRooms.has(code);
   const isSelected=selectedRooms.has(code);
   const leader=players.sort((a,b)=>(b[1].score||0)-(a[1].score||0))[0];
-  const lastActive=players.reduce((t,[,p])=>Math.max(t,p.lastUpdated||0),0);
+  const lastActive=roomLastActivity(room);
   const ago=lastActive?formatAgo(now-lastActive):'–';
+  const leftMin=lastActive?Math.max(0,Math.round((ROOM_MAX_IDLE-(now-lastActive))/60e3)):null;
   return `<div class="room-card${isSelected?' selected':''}" id="room-${code}">
     <div class="room-header" onclick="toggleRoom('${code}')">
       <input type="checkbox" class="room-check" ${isSelected?'checked':''} onclick="event.stopPropagation();toggleSelect('${code}',this.checked)">
       <div class="room-code">${code}</div>
       <div class="room-meta">
         <div class="room-player-count">${players.length} spiller${players.length!==1?'e':''}</div>
-        <div class="room-last-active">Sist aktiv: ${ago}</div>
+        <div class="room-last-active">Sist aktiv: ${ago}${leftMin!==null&&leftMin<=60?` · slettes om ${leftMin} min`:''}</div>
         ${leader?`<div style="font-size:0.82rem;font-weight:700;color:var(--green)">🏆 ${leader[0]}: ${leader[1].score||0} p</div>`:''}
       </div>
       <div class="room-chevron${isOpen?' open':''}">›</div>
@@ -757,6 +795,15 @@ const GAME_LEVELS={
     4:'velge riktig formel for fₙ og vurdere om en påstått formel stemmer',
     5:'skrive formelen for fₙ selv og finne hvilken figur som har et gitt antall ruter',
     6:'løse blandede oppgaver om lineære figurtall med større tall',
+  },
+  'figurtall-tabell':{
+    1:'fylle ut tabell med figurtall og førstedifferanse, og se hvordan f₀ = f₁ − førstedifferansen',
+    2:'finne f₀ ved å sette inn f₁ og førstedifferansen',
+    3:'regne ut f₀ selv og se hvordan førstedifferansen og f₀ danner formelen',
+    4:'lage formelen ved å sette førstedifferansen og f₀ inn i ruter (også negativ f₀)',
+    5:'fylle ut tabell, finne f₀ og sette tallene inn i formelen',
+    6:'fylle ut tabell, finne f₀ og skrive hele formelen for fₙ selv',
+    7:'fylle ut tabell, finne f₀, skrive formelen og regne ut andre figurtall (f₅–f₁₀, f₁₅, f₂₀)',
   },
   'koordinatslag':{
     0:'koordinatslag (skyte på koordinater i et koordinatsystem)',

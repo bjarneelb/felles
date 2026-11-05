@@ -180,7 +180,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.9</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.11</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -251,6 +251,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
       <button class="btn btn-danger" id="closeSelectedBtn" onclick="confirmCloseSelected()" disabled>
         🗑️ Avslutt valgte rom
       </button>
+      <a class="btn" href="baner/demo-spillere.html" title="Legg inn falske spillere i et rom for å teste en bane" style="text-decoration:none;background:#f1f5f9;color:var(--text)">🤖 Demo-spillere</a>
       <span class="rooms-count" id="roomsCount">Laster...</span>
     </div>
     <div id="roomList"><div class="loading">Henter rom...</div></div>
@@ -804,6 +805,17 @@ const GAME_LEVELS={
     5:'fylle ut tabell, finne f₀ og sette tallene inn i formelen',
     6:'fylle ut tabell, finne f₀ og skrive hele formelen for fₙ selv',
     7:'fylle ut tabell, finne f₀, skrive formelen og regne ut andre figurtall (f₅–f₁₀, f₁₅, f₂₀)',
+  },
+  'figurtall-kvadratiske':{
+    1:'fylle ut tabell med første- og andredifferanse for kvadratiske figurtall, og se at andredifferansen er konstant',
+    2:'gå baklengs i tabellen for å finne f₀ med hjelp',
+    3:'regne ut f₀ selv og se hvordan formelen leses ut fra figuren (lengde · bredde + f₀)',
+    4:'lage formelen ut fra figuren i ruter: lengde · bredde (/ 2 for trapp) + f₀',
+    5:'fylle ut tabell, finne f₀ og lage formelen ut fra figuren i ruter',
+    6:'fylle ut tabell, finne f₀ og skrive hele formelen for kvadratiske figurtall selv',
+    7:'fylle ut tabell, finne f₀, skrive formelen og regne ut andre figurtall',
+    8:'bruke den generelle metoden fₙ = an² + bn + c med hjelp (a = andredifferansen / 2, c = f₀)',
+    9:'bruke den generelle metoden selv og regne ut andre figurtall',
   },
   'koordinatslag':{
     0:'koordinatslag (skyte på koordinater i et koordinatsystem)',

@@ -1,4 +1,4 @@
-// ── spill-utils.js v2.2 ──
+// ── spill-utils.js v2.3 ──
 // Felles hjelpefunksjoner for alle fagsider og spill.
 //
 // VIKTIG: Lastes i <head>, FØR spillets egen kode:
@@ -124,7 +124,7 @@ function showMatchOverToast(result){
     <div style="font-size:3rem">🏆</div>
     <div style="color:white;font-size:1.6rem;font-weight:900;text-align:center;padding:0 20px">${result}</div>
     <div style="color:rgba(255,255,255,0.7);font-size:0.88rem;text-align:center;padding:0 20px">Kampen er over! Start et nytt spill med kampkoden for en ny kamp.</div>
-    <a href="/" style="padding:12px 28px;background:#5b4fcf;color:white;border-radius:12px;font-weight:800;font-size:1rem;text-decoration:none;margin-top:8px">🏠 Tilbake til meny</a>`;
+    <a href="./" style="padding:12px 28px;background:#5b4fcf;color:white;border-radius:12px;font-weight:800;font-size:1rem;text-decoration:none;margin-top:8px">🏠 Tilbake til meny</a>`;
   document.body.appendChild(overlay);
 }
 function showToast(msg,type){
@@ -193,8 +193,8 @@ function changeLevel(d){
 // - Spill som mangler en knapp tilbake til menyen, får en.
 // En side kan slå dette av med <body data-su-chrome="off">.
 function menuHref(){
-  const depth=location.pathname.replace(/^\/+/,'').split('/').length-1;
-  return depth>0?'../'.repeat(depth):'./';
+  // Menyen i samme mappe som spillet: temamenyen (f.eks. figurtall/) eller fagets forside
+  return './';
 }
 function isMenuPage(){
   const p=location.pathname;
@@ -243,6 +243,15 @@ function addPlayerChrome(){
     d.innerHTML='Du spiller som <span style="display:inline-block;padding:2px 12px;border-radius:20px;background:#f1f5f9;color:#1e293b;border:1px solid #e2e8f0">🐾 '+suEsc(name)+'</span>';
     const p=card.querySelector('p');
     if(p&&p.parentNode===card) p.after(d); else card.insertBefore(d,card.firstChild);
+  }
+  // 2b) Lenke tilbake til menyen nederst på startskjermen (topplinjen ligger under startskjermen)
+  if(card&&!card.querySelector('.su-start-menu')){
+    const a=document.createElement('a');
+    a.className='su-start-menu';
+    a.href=menuHref();
+    a.textContent='← Tilbake til menyen';
+    a.style.cssText='display:inline-block;margin-top:14px;font-size:0.85rem;font-weight:800;color:#64748b;text-decoration:none;';
+    card.appendChild(a);
   }
   // 3) Knapp tilbake til menyen, hvis spillet ikke har en
   const hasMenu=[...document.querySelectorAll('a')].some(a=>/meny/i.test(a.textContent));

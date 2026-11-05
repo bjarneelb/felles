@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Demo-spillere</title>
+<script>
+// Bare for lærere: uten innlogging på lærersiden sendes man dit
+(function(){
+  let ok=false;
+  try{
+    ok=sessionStorage.getItem('teacher_auth_v1')==='true';
+    const r=JSON.parse(localStorage.getItem('teacher_remember_v1')||'null');
+    if(r&&r.until>Date.now()) ok=true;
+  }catch(e){}
+  if(!ok) location.replace('../laerer.html');
+})();
+</script>
 <style>
 :root{--bg:#0a0f1e;--panel:#0d1628;--border:#1a3a5c;--accent:#00d4ff;
   --green:#00ff88;--red:#ff3344;--yellow:#ffd700;--muted:#4a6a8a;--text:#c8e0f0;}
@@ -40,6 +52,7 @@ button:disabled{opacity:0.3;cursor:not-allowed;}
 </head>
 <body>
 <div class="card">
+  <a href="../laerer.html" style="display:inline-block;margin-bottom:10px;font-size:0.85rem;font-weight:800;color:inherit;opacity:0.75;text-decoration:none">← Tilbake til lærersiden</a>
   <h1>🤖 DEMO-SPILLERE</h1>
   <p>Sender tilfeldige poeng til Firebase — nyttig for å teste baner uten å løse oppgaver.</p>
 

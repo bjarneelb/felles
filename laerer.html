@@ -152,6 +152,17 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .bs-paste textarea{width:100%;min-height:120px;margin-top:8px;font-family:'Nunito',sans-serif;}
 @media (max-width:600px){ .bs-item,.bs-head{grid-template-columns:1fr auto;} .bs-item .bs-side{grid-column:1;} .bs-item .bs-del{grid-column:2;grid-row:1;} .bs-head .input-label:nth-child(2){display:none;} .bs-item{border-bottom:1px solid var(--border);padding-bottom:10px;} }
 
+/* RAPPORT: TILGJENGELIGE TIMEKODER */
+.rc-wrap{margin-top:14px;}
+.rc-label{font-size:0.75rem;font-weight:800;color:var(--muted);margin-bottom:8px;}
+.rc-list{display:flex;gap:8px;flex-wrap:wrap;}
+.rc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 12px;border-radius:12px;border:2px solid var(--border);background:white;cursor:pointer;font-family:'Nunito',sans-serif;text-align:left;}
+.rc:hover{border-color:var(--accent);}
+.rc.sel{border-color:var(--accent);background:#eef2ff;}
+.rc-code{font-weight:900;letter-spacing:2px;font-size:0.95rem;color:var(--text);}
+.rc-meta{font-size:0.72rem;font-weight:700;color:var(--muted);}
+.rc-live{color:#16a34a;}
+
 /* MISC */
 .empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
 .empty-state .icon{font-size:3rem;margin-bottom:12px;}
@@ -207,7 +218,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.13</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.14</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -300,6 +311,10 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
             style="text-transform:uppercase;letter-spacing:2px;width:160px">
         </div>
         <button class="btn btn-ghost" onclick="loadRapportStudents()">🔍 Hent elever</button>
+      </div>
+      <div class="rc-wrap" id="rapportCodesWrap" style="display:none">
+        <div class="rc-label">Timekoder med data (siste 24 timer) – klikk for å hente elevene</div>
+        <div class="rc-list" id="rapportCodes"></div>
       </div>
     </div>
 
@@ -627,8 +642,37 @@ function checkExistingTimecode(){
         window._remove(window._ref(window._db,'timecodes/'+code));
       }
     });
+    rapportCodesData=data; renderRapportCodes();
   });
 }
+
+// Timekoder som fortsatt har data for rapport (inntil 24 timer etter at de utløp)
+let rapportCodesData={};
+function renderRapportCodes(){
+  const now=Date.now(), DAY=24*60*60*1000;
+  const list=Object.entries(rapportCodesData)
+    .filter(([c,tc])=>tc&&tc.expires&&tc.expires>now-DAY)
+    .sort((a,b)=>(b[1].created||b[1].expires)-(a[1].created||a[1].expires));
+  const wrap=document.getElementById('rapportCodesWrap');
+  if(!list.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  const cur=document.getElementById('rapportCode').value.trim().toUpperCase();
+  const fmt=t=>{ const d=new Date(t), today=new Date().toDateString()===d.toDateString();
+    return (today?'i dag ':'i går ')+d.toLocaleTimeString('no',{hour:'2-digit',minute:'2-digit'}); };
+  document.getElementById('rapportCodes').innerHTML=list.map(([c,tc])=>{
+    const n=Object.keys(tc.players||{}).length, live=tc.expires>now;
+    return '<button class="rc'+(c===cur?' sel':'')+'" onclick="pickRapportCode(\''+c+'\')">'+
+      '<span class="rc-code">'+c+'</span>'+
+      '<span class="rc-meta">'+(tc.created?fmt(tc.created):'')+' · '+n+' elev'+(n===1?'':'er')+'</span>'+
+      '<span class="rc-meta'+(live?' rc-live':'')+'">'+(live?'● Aktiv':'Utløp '+fmt(tc.expires))+'</span></button>';
+  }).join('');
+}
+window.pickRapportCode=function(c){
+  document.getElementById('rapportCode').value=c;
+  renderRapportCodes();
+  loadRapportStudents();
+};
+setInterval(renderRapportCodes,60000);
 
 // ── ROOMS ──
 let roomsData={}, openRooms=new Set(), selectedRooms=new Set();

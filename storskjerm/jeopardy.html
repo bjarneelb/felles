@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Begrepsjeopardy</title>
+<script>
+// Bare for lærere: uten innlogging på lærersiden sendes man dit
+(function(){
+  let ok=false;
+  try{
+    ok=sessionStorage.getItem('teacher_auth_v1')==='true';
+    const r=JSON.parse(localStorage.getItem('teacher_remember_v1')||'null');
+    if(r&&r.until>Date.now()) ok=true;
+  }catch(e){}
+  if(!ok) location.replace('../laerer.html');
+})();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b1440; --board:#0f1d5c; --cell:#1a2f8a; --cell-hi:#2440b3; --used:#0c1647;
+  --gold:#ffcc33; --text:#ffffff; --muted:#a9b6e8; --line:#2b3f99;
+  --green:#22c55e; --red:#ef4444; --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:'Nunito',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;min-height:100vh;}
+button{font-family:inherit;}
+.hidden{display:none !important;}
+
+/* TOPPLINJE */
+.top{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#081033;border-bottom:2px solid var(--line);flex-wrap:wrap;}
+.top h1{font-size:1.3rem;font-weight:900;color:var(--gold);letter-spacing:.5px;flex:1;}
+.tbtn{padding:7px 14px;border-radius:10px;border:1px solid var(--line);background:#12205f;color:var(--text);font-weight:800;font-size:.85rem;cursor:pointer;text-decoration:none;}
+.tbtn:hover{background:#1b2d80;}
+
+/* OPPSETT */
+.setup{width:100%;max-width:980px;margin:0 auto;padding:24px 20px 40px;display:flex;flex-direction:column;gap:22px;}
+.box{background:var(--board);border:2px solid var(--line);border-radius:var(--r);padding:18px 20px;}
+.box h2{font-size:.78rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);font-weight:900;margin-bottom:12px;}
+.hint{color:var(--muted);font-weight:700;font-size:.88rem;}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.chip{padding:6px 14px;border-radius:20px;border:2px solid var(--line);background:transparent;color:var(--text);font-weight:800;font-size:.85rem;cursor:pointer;}
+.chip.on{background:var(--gold);border-color:var(--gold);color:#1b1b1b;}
+.sets-tema{font-size:.8rem;font-weight:800;color:var(--muted);margin:10px 0 6px;}
+.sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;}
+.set{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:#12205f;cursor:pointer;font-weight:800;text-align:left;color:var(--text);}
+.set:hover{border-color:var(--muted);}
+.set.on{border-color:var(--gold);background:#2a2a10;}
+.set .num{margin-left:auto;font-size:.75rem;color:var(--muted);}
+.set .tick{width:22px;height:22px;border-radius:6px;border:2px solid var(--muted);display:grid;place-items:center;flex:none;font-size:.8rem;}
+.set.on .tick{background:var(--gold);border-color:var(--gold);color:#1b1b1b;}
+.row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label,.field .lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:900;}
+.inp{padding:9px 12px;border-radius:10px;border:2px solid var(--line);background:#0b1652;color:var(--text);font-family:inherit;font-weight:800;font-size:1rem;outline:none;}
+.inp:focus{border-color:var(--gold);}
+.seg{display:flex;border:2px solid var(--line);border-radius:10px;overflow:hidden;}
+.seg button{padding:8px 14px;border:none;background:#0b1652;color:var(--text);font-weight:800;cursor:pointer;}
+.seg button.on{background:var(--gold);color:#1b1b1b;}
+.teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:12px;}
+.check{display:flex;align-items:center;gap:8px;font-weight:800;cursor:pointer;}
+.check input{width:18px;height:18px;accent-color:var(--gold);}
+.big{padding:14px 28px;border-radius:14px;border:none;background:var(--gold);color:#1b1b1b;font-weight:900;font-size:1.1rem;cursor:pointer;}
+.big:disabled{opacity:.4;cursor:not-allowed;}
+.big.ghost{background:transparent;color:var(--text);border:2px solid var(--line);}
+.err{color:#fca5a5;font-weight:800;min-height:1.2em;}
+
+/* BRETTET */
+.game{flex:1;display:flex;flex-direction:column;padding:14px 16px 12px;gap:12px;min-height:0;}
+.board{flex:1;display:grid;gap:8px;min-height:0;}
+.cat{background:var(--board);border-radius:10px;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px 6px;font-weight:900;font-size:clamp(.85rem,1.6vw,1.4rem);text-transform:uppercase;letter-spacing:.5px;line-height:1.15;border-bottom:4px solid var(--gold);min-height:58px;word-break:break-word;}
+.cell{background:var(--cell);border:none;border-radius:10px;color:var(--gold);font-weight:900;font-size:clamp(1.3rem,3.6vw,3.2rem);cursor:pointer;text-shadow:0 3px 0 rgba(0,0,0,.35);transition:transform .12s,background .12s;min-height:52px;}
+.cell:hover{background:var(--cell-hi);transform:scale(1.03);}
+.cell.used,.cell.empty{background:var(--used);color:transparent;cursor:default;transform:none;text-shadow:none;}
+.cell.used::after{content:'✓';color:#33417f;font-size:clamp(1rem,2vw,1.6rem);}
+.scores{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.team{position:relative;min-width:150px;flex:1;max-width:260px;background:var(--board);border:3px solid var(--line);border-radius:14px;padding:8px 12px;text-align:center;cursor:pointer;}
+.team.turn{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,204,51,.25);}
+.team .tn{font-weight:900;font-size:clamp(.9rem,1.4vw,1.2rem);}
+.team .ts{font-weight:900;font-size:clamp(1.4rem,2.6vw,2.2rem);color:var(--gold);}
+.team .ts.neg{color:#fca5a5;}
+.team .turnlbl{font-size:.68rem;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:var(--gold);min-height:1em;}
+.team .adj{position:absolute;top:6px;display:none;width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:#12205f;color:var(--text);font-weight:900;cursor:pointer;}
+.team:hover .adj{display:block;}
+.team .adj.m{left:6px;} .team .adj.p{right:6px;}
+
+/* SPØRSMÅL */
+.clue{position:fixed;inset:0;z-index:50;background:var(--cell);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 5vw;gap:22px;text-align:center;animation:pop .25s ease;}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+.clue .meta{font-weight:900;color:var(--gold);font-size:clamp(1rem,2vw,1.6rem);text-transform:uppercase;letter-spacing:1px;}
+.clue .q{font-weight:800;font-size:clamp(1.6rem,4.2vw,3.6rem);line-height:1.25;max-width:1200px;text-shadow:0 3px 0 rgba(0,0,0,.3);}
+.clue .ans{font-weight:900;font-size:clamp(1.4rem,3.4vw,3rem);color:var(--gold);min-height:1.3em;}
+.clue .ans.ok{color:#86efac;}
+.clue .who{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.clue .who .lbl{width:100%;color:var(--muted);font-weight:800;}
+.pick{padding:10px 18px;border-radius:12px;border:3px solid rgba(255,255,255,.35);background:rgba(0,0,0,.2);color:var(--text);font-weight:900;font-size:1.05rem;cursor:pointer;}
+.pick.sel{border-color:var(--gold);background:rgba(255,204,51,.18);}
+.pick:disabled{opacity:.35;text-decoration:line-through;cursor:not-allowed;}
+.judge{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+.jbtn{padding:12px 26px;border-radius:12px;border:none;font-weight:900;font-size:1.1rem;cursor:pointer;color:white;}
+.jbtn.ok{background:var(--green);} .jbtn.no{background:var(--red);} .jbtn.neutral{background:rgba(0,0,0,.3);border:2px solid rgba(255,255,255,.35);}
+
+/* SLUTT */
+.end{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:30px 20px;text-align:center;}
+.end h2{font-size:clamp(2rem,5vw,4rem);font-weight:900;color:var(--gold);}
+.podium{display:flex;flex-direction:column;gap:10px;width:100%;max-width:560px;}
+.prow{display:flex;align-items:center;gap:14px;background:var(--board);border:2px solid var(--line);border-radius:14px;padding:12px 18px;font-weight:900;font-size:clamp(1rem,2.2vw,1.6rem);}
+.prow.first{border-color:var(--gold);background:#2a2a10;}
+.prow .pp{margin-left:auto;color:var(--gold);}
+
+@media (max-width:640px){ .team{min-width:120px;} .top h1{font-size:1.1rem;} }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>🎯 Begrepsjeopardy</h1>
+  <button class="tbtn" id="fsBtn" onclick="toggleFs()">⛶ Fullskjerm</button>
+  <button class="tbtn hidden" id="quitBtn" onclick="quitGame()">✕ Avslutt spillet</button>
+  <a class="tbtn" href="../laerer.html">← Lærerside</a>
+</div>
+
+<!-- OPPSETT -->
+<div class="setup" id="setup">
+  <div class="box hidden" id="resumeBox">
+    <h2>Spill i gang</h2>
+    <div class="row">
+      <span class="hint" id="resumeInfo" style="flex:1"></span>
+      <button class="big" onclick="resumeGame()">▶ Fortsett spillet</button>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2>1. Velg begrepssett – ett per kolonne</h2>
+    <div class="chips" id="fagChips"></div>
+    <div id="setList"><div class="hint">Henter begrepssett …</div></div>
+    <div class="hint" style="margin-top:10px" id="pickInfo">Velg 1–6 sett.</div>
+  </div>
+
+  <div class="box">
+    <h2>2. Brett og lag</h2>
+    <div class="row">
+      <div class="field"><span class="lbl">Ruter per kolonne</span>
+        <div class="seg" id="rowSeg"><button data-v="3">3</button><button data-v="4">4</button><button data-v="5" class="on">5</button></div></div>
+      <div class="field"><span class="lbl">Antall lag</span>
+        <div class="seg" id="teamSeg"><button data-v="2">2</button><button data-v="3" class="on">3</button><button data-v="4">4</button><button data-v="5">5</button><button data-v="6">6</button></div></div>
+      <label class="check"><input type="checkbox" id="minus"> Trekk poeng ved feil svar</label>
+    </div>
+    <div class="teams" id="teamNames"></div>
+  </div>
+
+  <div class="row" style="justify-content:space-between">
+    <div class="err" id="setupErr"></div>
+    <button class="big" id="startBtn" onclick="startGame()" disabled>Start spillet →</button>
+  </div>
+</div>
+
+<!-- BRETTET -->
+<div class="game hidden" id="game">
+  <div class="board" id="board"></div>
+  <div class="scores" id="scores"></div>
+</div>
+
+<!-- SPØRSMÅL -->
+<div class="clue hidden" id="clue">
+  <div class="meta" id="clueMeta"></div>
+  <div class="q" id="clueQ"></div>
+  <div class="ans" id="clueAns"></div>
+  <div class="who" id="clueWho"></div>
+  <div class="judge" id="clueJudge"></div>
+</div>
+
+<!-- SLUTT -->
+<div class="end hidden" id="end">
+  <h2>🏆 <span id="winner"></span></h2>
+  <div class="podium" id="podium"></div>
+  <div class="row" style="justify-content:center">
+    <button class="big" onclick="replay()">🔁 Nytt brett, samme oppsett</button>
+    <button class="big ghost" onclick="toSetup()">Velg nye sett</button>
+  </div>
+</div>
+
+<script type="module">
+  import { database, ref, get } from "../js/firebase-config.js";
+  window._db=database; window._ref=ref; window._get=get; window._fbReady=true;
+  window.dispatchEvent(new Event('fbready'));
+</script>
+
+<script>
+const STORE='jeopardy_state_v1';
+const $=id=>document.getElementById(id);
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const listOf=v=>Array.isArray(v)?v.filter(Boolean):Object.values(v||{}).filter(Boolean);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const cmp=(a,b)=>String(a).localeCompare(String(b),'nb');
+
+let sets={};                 // alle begrepssett fra databasen
+let chosen=[];               // id-er i valgt rekkefølge (= kolonnene)
+let fagFilter='';
+let rows=5, teamCount=3, teamNames=['Lag 1','Lag 2','Lag 3','Lag 4','Lag 5','Lag 6'];
+let G=null;                  // spilltilstand
+let clueState=null;          // {c,r,answering,tried:Set,done}
+const isOver=g=>g.cols.every(c=>c.cells.every(x=>!x||x.used));
+
+// ── LAGRING (bare på denne maskinen, slik at spillet tåler at siden lastes på nytt) ──
+function save(){ try{ G?localStorage.setItem(STORE,JSON.stringify(G)):localStorage.removeItem(STORE); }catch(e){} }
+function loadSaved(){ try{ return JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){ return null; } }
+
+// ── OPPSETT ──
+function onFb(){
+  window._get(window._ref(window._db,'begrepssett')).then(snap=>{
+    sets=snap.val()||{};
+    renderSetup();
+  }).catch(e=>{ $('setList').innerHTML='<div class="err">Fikk ikke hentet begrepssettene: '+esc(e.message)+'</div>'; });
+}
+if(window._fbReady) onFb(); else window.addEventListener('fbready',onFb,{once:true});
+
+function renderSetup(){
+  const ids=Object.keys(sets).filter(id=>listOf(sets[id].begreper).length>0);
+  if(!ids.length){
+    $('fagChips').innerHTML='';
+    $('setList').innerHTML='<div class="hint">Ingen begrepssett ennå. Lag sett under «📚 Begrepssett» på <a href="../laerer.html" style="color:var(--gold)">lærersiden</a>.</div>';
+    return;
+  }
+  const fags=[...new Set(ids.map(id=>sets[id].fag||'Uten fag'))].sort(cmp);
+  $('fagChips').innerHTML=['', ...fags].map(f=>'<button class="chip'+(f===fagFilter?' on':'')+'" data-f="'+esc(f)+'">'+(f?esc(f):'Alle fag')+'</button>').join('');
+  $('fagChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ fagFilter=b.dataset.f; renderSetup(); });
+  const shown=ids.filter(id=>!fagFilter||(sets[id].fag||'Uten fag')===fagFilter);
+  const groups={};
+  shown.forEach(id=>{ const k=(sets[id].fag||'Uten fag')+' · '+(sets[id].tema||'Uten tema'); (groups[k]=groups[k]||[]).push(id); });
+  $('setList').innerHTML=Object.keys(groups).sort(cmp).map(k=>'<div class="sets-tema">'+esc(k)+'</div><div class="sets">'+
+    groups[k].sort((a,b)=>cmp(sets[a].navn,sets[b].navn)).map(id=>{
+      const i=chosen.indexOf(id);
+      return '<button class="set'+(i>=0?' on':'')+'" data-id="'+esc(id)+'"><span class="tick">'+(i>=0?i+1:'')+'</span>'+esc(sets[id].navn||id)+
+        '<span class="num">'+listOf(sets[id].begreper).length+'</span></button>';
+    }).join('')+'</div>').join('');
+  $('setList').querySelectorAll('.set').forEach(b=>b.onclick=()=>toggleSet(b.dataset.id));
+  updatePickInfo();
+}
+function toggleSet(id){
+  const i=chosen.indexOf(id);
+  if(i>=0) chosen.splice(i,1);
+  else if(chosen.length<6) chosen.push(id);
+  else { $('setupErr').textContent='Maks seks kolonner.'; return; }
+  $('setupErr').textContent='';
+  renderSetup();
+}
+function updatePickInfo(){
+  const short=chosen.filter(id=>listOf(sets[id].begreper).length<rows).map(id=>sets[id].navn);
+  $('pickInfo').textContent=chosen.length
+    ? 'Kolonner: '+chosen.map(id=>sets[id].navn).join(' · ')+(short.length?'  —  '+short.join(', ')+' har færre enn '+rows+' begreper, så noen ruter blir tomme.':'')
+    : 'Velg 1–6 sett. Rekkefølgen du velger i, blir rekkefølgen på brettet.';
+  $('startBtn').disabled=!chosen.length;
+}
+function renderTeamInputs(){
+  $('teamNames').innerHTML=Array.from({length:teamCount},(_,i)=>
+    '<input class="inp" maxlength="18" data-i="'+i+'" value="'+esc(teamNames[i])+'" aria-label="Navn på lag '+(i+1)+'">').join('');
+  $('teamNames').querySelectorAll('input').forEach(inp=>inp.oninput=()=>{ teamNames[+inp.dataset.i]=inp.value; });
+}
+function bindSeg(el,cb){
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    el.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); cb(+b.dataset.v);
+  });
+}
+bindSeg($('rowSeg'),v=>{ rows=v; updatePickInfo(); });
+bindSeg($('teamSeg'),v=>{ teamCount=v; renderTeamInputs(); });
+renderTeamInputs();
+
+function showResume(){
+  const s=loadSaved();
+  if(s&&s.cols&&!isOver(s)){
+    const left=s.cols.reduce((n,c)=>n+c.cells.filter(x=>x&&!x.used).length,0);
+    $('resumeInfo').textContent=s.cols.map(c=>c.navn).join(' · ')+' — '+left+' ruter igjen';
+    $('resumeBox').classList.remove('hidden');
+  } else $('resumeBox').classList.add('hidden');
+}
+showResume();
+
+// ── SPILLET ──
+function buildBoard(cfg){
+  return cfg.setIds.map(id=>{
+    const s=cfg.snapshot[id];
+    const picked=shuffle(listOf(s.begreper)).slice(0,cfg.rows);
+    return { navn:s.navn, cells:Array.from({length:cfg.rows},(_,r)=>picked[r]?{begrep:picked[r].begrep,forklaring:picked[r].forklaring,used:false}:null) };
+  });
+}
+window.startGame=function(){
+  if(!chosen.length) return;
+  const names=teamNames.slice(0,teamCount).map((n,i)=>n.trim()||'Lag '+(i+1));
+  const snapshot={}; chosen.forEach(id=>snapshot[id]={navn:sets[id].navn,begreper:listOf(sets[id].begreper)});
+  const cfg={setIds:chosen.slice(),rows,snapshot,minus:$('minus').checked};
+  G={cfg, cols:buildBoard(cfg), teams:names.map(n=>({navn:n,poeng:0})), turn:0};
+  save(); showGame();
+};
+window.resumeGame=function(){ G=loadSaved(); if(G) showGame(); };
+window.replay=function(){
+  if(!G) return;
+  G.cols=buildBoard(G.cfg); G.teams.forEach(t=>t.poeng=0); G.turn=0;
+  save(); showGame();
+};
+window.toSetup=function(){
+  G=null; save();
+  ['game','end','clue'].forEach(id=>$(id).classList.add('hidden'));
+  $('setup').classList.remove('hidden'); $('quitBtn').classList.add('hidden');
+  showResume(); renderSetup();
+};
+window.quitGame=function(){
+  if(confirm('Avslutte spillet? Poengene forsvinner.')) toSetup();
+};
+
+function showGame(){
+  $('setup').classList.add('hidden'); $('end').classList.add('hidden');
+  $('game').classList.remove('hidden'); $('quitBtn').classList.remove('hidden');
+  if(isOver(G)){ showEnd(); return; }
+  renderBoard(); renderScores();
+}
+function renderBoard(){
+  const n=G.cols.length, R=G.cfg.rows;
+  const b=$('board');
+  b.style.gridTemplateColumns='repeat('+n+',1fr)';
+  b.style.gridTemplateRows='auto repeat('+R+',1fr)';
+  let h=G.cols.map(c=>'<div class="cat">'+esc(c.navn)+'</div>').join('');
+  for(let r=0;r<R;r++) h+=G.cols.map((c,ci)=>{
+    const x=c.cells[r];
+    if(!x) return '<div class="cell empty"></div>';
+    return '<button class="cell'+(x.used?' used':'')+'" data-c="'+ci+'" data-r="'+r+'"'+(x.used?' disabled':'')+'>'+(x.used?'':(r+1)*100)+'</button>';
+  }).join('');
+  b.innerHTML=h;
+  b.querySelectorAll('button.cell:not(.used)').forEach(el=>el.onclick=()=>openClue(+el.dataset.c,+el.dataset.r));
+}
+function renderScores(){
+  $('scores').innerHTML=G.teams.map((t,i)=>
+    '<div class="team'+(i===G.turn?' turn':'')+'" data-i="'+i+'" title="Klikk for å gi laget turen">'+
+      '<button class="adj m" data-i="'+i+'" data-d="-100" title="Trekk 100 poeng">−</button>'+
+      '<button class="adj p" data-i="'+i+'" data-d="100" title="Gi 100 poeng">+</button>'+
+      '<div class="turnlbl">'+(i===G.turn?'Velger rute':'')+'</div>'+
+      '<div class="tn">'+esc(t.navn)+'</div>'+
+      '<div class="ts'+(t.poeng<0?' neg':'')+'">'+t.poeng+'</div></div>').join('');
+  $('scores').querySelectorAll('.team').forEach(el=>el.onclick=()=>{ G.turn=+el.dataset.i; save(); renderScores(); });
+  $('scores').querySelectorAll('.adj').forEach(el=>el.onclick=e=>{
+    e.stopPropagation(); G.teams[+el.dataset.i].poeng+=+el.dataset.d; save(); renderScores();
+  });
+}
+
+// ── EN RUTE ──
+function openClue(c,r){
+  const x=G.cols[c].cells[r];
+  clueState={c,r,value:(r+1)*100,answering:null,tried:new Set(),done:false};
+  $('clueMeta').textContent=G.cols[c].navn+' · '+clueState.value;
+  $('clueQ').textContent=x.forklaring;
+  $('clueAns').textContent=''; $('clueAns').className='ans';
+  $('clue').classList.remove('hidden');
+  renderClueControls();
+}
+function renderClueControls(){
+  const s=clueState, who=$('clueWho'), j=$('clueJudge');
+  if(s.done){
+    who.innerHTML='';
+    j.innerHTML='<button class="jbtn neutral" id="backBtn">Tilbake til brettet →</button>';
+    $('backBtn').onclick=closeClue; $('backBtn').focus();
+    return;
+  }
+  who.innerHTML='<div class="lbl">Hvem svarer?</div>'+G.teams.map((t,i)=>
+    '<button class="pick'+(s.answering===i?' sel':'')+'" data-i="'+i+'"'+(s.tried.has(i)?' disabled':'')+'>'+esc(t.navn)+'</button>').join('');
+  who.querySelectorAll('.pick').forEach(b=>b.onclick=()=>{ s.answering=+b.dataset.i; renderClueControls(); });
+  if(s.answering===null){
+    j.innerHTML='<button class="jbtn neutral" id="revealBtn">Ingen vet – vis svaret</button>';
+  } else {
+    j.innerHTML='<button class="jbtn ok" id="okBtn">✓ Riktig</button><button class="jbtn no" id="noBtn">✗ Feil</button>'+
+      '<button class="jbtn neutral" id="revealBtn">Ingen vet – vis svaret</button>';
+    $('okBtn').onclick=()=>judge(true); $('noBtn').onclick=()=>judge(false);
+  }
+  $('revealBtn').onclick=()=>finishClue(null);
+}
+function judge(ok){
+  const s=clueState, t=G.teams[s.answering];
+  if(ok){ t.poeng+=s.value; G.turn=s.answering; finishClue(s.answering); return; }
+  if(G.cfg.minus) t.poeng-=s.value;
+  s.tried.add(s.answering); s.answering=null;
+  save();
+  if(s.tried.size>=G.teams.length){ finishClue(null); return; }
+  renderClueControls();
+}
+function finishClue(winner){
+  const s=clueState, x=G.cols[s.c].cells[s.r];
+  x.used=true; s.done=true;
+  $('clueAns').innerHTML=(winner!==null?'✓ '+esc(G.teams[winner].navn)+': ':'Svar: ')+'<span style="text-transform:none">'+esc(x.begrep)+'</span>';
+  $('clueAns').className='ans'+(winner!==null?' ok':'');
+  save(); renderClueControls();
+}
+function closeClue(){
+  $('clue').classList.add('hidden'); clueState=null;
+  if(isOver(G)) showEnd(); else { renderBoard(); renderScores(); }
+}
+
+// ── SLUTT ──
+function showEnd(){
+  $('game').classList.add('hidden'); $('end').classList.remove('hidden');
+  const ranked=G.teams.map(t=>({...t})).sort((a,b)=>b.poeng-a.poeng);
+  const top=ranked.filter(t=>t.poeng===ranked[0].poeng);
+  $('winner').textContent=top.length>1?'Uavgjort: '+top.map(t=>t.navn).join(' og '):ranked[0].navn+' vant!';
+  const medal=['🥇','🥈','🥉'];
+  let place=0;
+  $('podium').innerHTML=ranked.map((t,i)=>{
+    if(i>0&&t.poeng<ranked[i-1].poeng) place=i;
+    return '<div class="prow'+(place===0?' first':'')+'"><span>'+(medal[place]||(place+1)+'.')+'</span><span>'+esc(t.navn)+'</span><span class="pp">'+t.poeng+'</span></div>';
+  }).join('');
+}
+
+// ── FULLSKJERM ──
+window.toggleFs=function(){
+  if(document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen().catch(()=>{});
+};
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&clueState&&clueState.done) closeClue();
+});
+</script>
+</body>
+</html>

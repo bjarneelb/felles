@@ -37,7 +37,8 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .btn-menu{padding:6px 16px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;color:white;font-family:'Nunito',sans-serif;font-weight:700;font-size:0.82rem;text-decoration:none;}
 
 /* TABS */
-.tabs{width:100%;max-width:960px;padding:20px 20px 0;display:flex;gap:4px;}
+.tabs{width:100%;max-width:960px;padding:20px 20px 0;display:flex;gap:4px;overflow-x:auto;}
+.tab{white-space:nowrap;}
 .tab{padding:10px 20px;border:none;border-radius:12px 12px 0 0;font-family:'Nunito',sans-serif;font-weight:800;font-size:0.9rem;cursor:pointer;background:#e0e7ff;color:var(--muted);transition:all 0.15s;}
 .tab.active{background:var(--accent);color:white;}
 .tab:hover:not(.active){background:#c7d2fe;color:var(--text);}
@@ -125,6 +126,24 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .rapport-text.rapport-error{background:#fef2f2;border-left-color:var(--red);color:#991b1b;font-weight:700;}
 .rapport-loading{color:var(--muted);font-size:0.85rem;font-weight:700;font-style:italic;}
 
+/* BEGREPSSETT */
+.bs-fag{font-size:0.75rem;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin:8px 0 6px;}
+.bs-tema{font-size:0.8rem;font-weight:800;color:var(--muted);margin:6px 0 4px 2px;}
+.bs-row{display:flex;align-items:center;gap:10px;background:white;border:2px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:6px;flex-wrap:wrap;}
+.bs-name{font-weight:900;flex:1;min-width:140px;}
+.bs-count{font-size:0.78rem;color:var(--muted);font-weight:700;}
+.btn-sm{padding:6px 12px;font-size:0.8rem;}
+.bs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px;}
+.bs-grid .styled-input{width:100%;}
+.bs-item{display:grid;grid-template-columns:minmax(120px,1fr) 2.2fr auto;gap:8px;align-items:start;margin-bottom:8px;}
+.bs-item textarea{resize:vertical;min-height:42px;font-family:'Nunito',sans-serif;}
+.bs-item .bs-del{padding:9px 11px;background:#fee2e2;color:#b91c1c;}
+.bs-head{display:grid;grid-template-columns:minmax(120px,1fr) 2.2fr 40px;gap:8px;}
+.bs-paste{margin-top:12px;font-size:0.85rem;font-weight:700;}
+.bs-paste summary{cursor:pointer;color:var(--accent);}
+.bs-paste textarea{width:100%;min-height:120px;margin-top:8px;font-family:'Nunito',sans-serif;}
+@media (max-width:600px){ .bs-item,.bs-head{grid-template-columns:1fr auto;} .bs-item textarea{grid-column:1/2;} .bs-head .input-label:nth-child(2){display:none;} }
+
 /* MISC */
 .empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
 .empty-state .icon{font-size:3rem;margin-bottom:12px;}
@@ -180,7 +199,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.11</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.12</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -193,6 +212,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
   <button class="tab" onclick="showTab('live')">👥 Live-oversikt</button>
   <button class="tab" onclick="showTab('rom')">🏁 Spillrom</button>
   <button class="tab" onclick="showTab('rapport')">📊 Rapport</button>
+  <button class="tab" onclick="showTab('begrep')">📚 Begrepssett</button>
 </div>
 
 <div class="main">
@@ -292,6 +312,44 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
     <div id="rapportOutput"></div>
   </div>
 
+  <!-- ── BEGREPSSETT ── -->
+  <div class="tab-panel" id="tab-begrep">
+    <div>
+      <div class="panel-title">📚 Begrepssett</div>
+      <div class="panel-sub">Begreper med forklaringer, sortert etter fag og tema. Brukes i Begrepsjeopardy og de andre begrepsspillene.</div>
+    </div>
+    <div class="toolbar" id="bsToolbar">
+      <button class="btn btn-primary" onclick="bsNew()">➕ Nytt sett</button>
+      <a class="btn" href="storskjerm/jeopardy.html" style="text-decoration:none;background:#fef3c7;color:#92400e">🎯 Begrepsjeopardy</a>
+      <span class="rooms-count" id="bsCount"></span>
+    </div>
+
+    <div class="card" id="bsEditor" style="display:none">
+      <div class="card-label" id="bsEditorTitle">Nytt sett</div>
+      <div class="bs-grid">
+        <div class="input-group"><div class="input-label">Navn på settet</div><input class="styled-input" id="bsNavn" maxlength="40" placeholder="f.eks. Atomer"></div>
+        <div class="input-group"><div class="input-label">Fag</div><input class="styled-input" id="bsFag" list="bsFagList" maxlength="30" placeholder="f.eks. Naturfag"></div>
+        <div class="input-group"><div class="input-label">Tema</div><input class="styled-input" id="bsTema" list="bsTemaList" maxlength="40" placeholder="f.eks. Kjemi"></div>
+      </div>
+      <datalist id="bsFagList"></datalist><datalist id="bsTemaList"></datalist>
+      <div class="bs-head"><div class="input-label">Begrep</div><div class="input-label">Forklaring</div><div></div></div>
+      <div id="bsItems"></div>
+      <button class="btn btn-ghost btn-sm" onclick="bsAddItem()">➕ Legg til begrep</button>
+      <details class="bs-paste">
+        <summary>Lim inn mange begreper på en gang</summary>
+        <div style="color:var(--muted);font-weight:600;margin-top:6px">Ett begrep per linje: begrep, så semikolon eller tabulator, så forklaringen. Fra et regneark kan du kopiere to kolonner rett inn.</div>
+        <textarea class="styled-input" id="bsPaste" placeholder="proton; Partikkel med positiv ladning i atomkjernen&#10;nøytron; Partikkel uten ladning i atomkjernen"></textarea>
+        <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="bsImportPaste()">Legg til i listen</button>
+      </details>
+      <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="bsSave()">💾 Lagre</button>
+        <button class="btn btn-ghost" onclick="bsClose()">Avbryt</button>
+      </div>
+    </div>
+
+    <div id="bsList"><div class="loading">Henter begrepssett...</div></div>
+  </div>
+
 </div>
 
 <!-- FIREBASE -->
@@ -371,13 +429,14 @@ function waitForFirebase(){
 // ── TABS ──
 window.showTab=function(name){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const panels=['timekode','live','rom','rapport'];
+    const panels=['timekode','live','rom','rapport','begrep'];
     t.classList.toggle('active',panels[i]===name);
   });
   document.querySelectorAll('.tab-panel').forEach(p=>{
     p.classList.toggle('active',p.id==='tab-'+name);
   });
   if(name==='live') mergeAndUpdateLiveGrid();
+  if(name==='begrep') loadBegrepssett();
 };
 
 // ── INIT ──
@@ -707,7 +766,7 @@ function deleteRoom(code){
   window._remove(window._ref(window._db,'rooms/'+code));
   showToast('Rom '+code+' avsluttet','success');
 }
-window.closeConfirm=function(){ document.getElementById('confirmOverlay').classList.remove('show'); };
+window.closeConfirm=function(){ document.getElementById('confirmOverlay').classList.remove('show'); document.getElementById('confirmOkBtn').textContent='Avslutt'; };
 
 // ── RAPPORT ──
 const GAME_LEVELS={
@@ -1055,6 +1114,148 @@ function explainAiError(status,data,raw){
     return 'AI-tjenesten svarte, men uten tekst. Prøv igjen.';
   return 'Feilkode '+status+': '+msg;
 }
+
+// ── BEGREPSSETT ──
+// Lagres under begrepssett/<id> = {navn, fag, tema, begreper:[{begrep, forklaring}], endret}
+const BS_FAG=['Matematikk','Naturfag','Samfunnsfag','Norsk','Engelsk','Tysk','Fransk','KRLE','Mat og helse','Kunst og håndverk','Musikk','Kroppsøving'];
+const BS_KJEMI={navn:'Kjemi',fag:'Naturfag',tema:'Kjemi',begreper:[
+ ['proton','Partikkel med positiv ladning inne i atomkjernen. Hvor mange det er, bestemmer hvilket grunnstoff atomet er.'],
+ ['nøytron','Partikkel uten ladning inne i atomkjernen. Den veier omtrent like mye som et proton.'],
+ ['elektron','Liten partikkel med negativ ladning som beveger seg rundt kjernen. Den veier nesten ingenting.'],
+ ['atomkjerne','Den lille og tunge midten av atomet, satt sammen av protoner og nøytroner.'],
+ ['elektronskall','Område rundt kjernen der elektronene holder til. Det innerste har plass til to elektroner.'],
+ ['atomnummer','Tallet som sier hvor mange protoner atomet har, og som bestemmer plassen i periodesystemet.'],
+ ['grunnstoff','Stoff som bare består av én type atomer, for eksempel oksygen, jern eller gull.'],
+ ['periodesystemet','Tabellen der alle grunnstoffene er ordnet etter atomnummer, slik at stoffer som ligner, står nær hverandre.'],
+ ['gruppe','Loddrett kolonne i periodesystemet. Stoffene i den har like mange elektroner i ytterste skall.'],
+ ['periode','Vannrett rad i periodesystemet. Alle stoffene i raden har like mange elektronskall.'],
+ ['åtteregelen','Regelen om at atomer er mest stabile når det ytterste skallet har åtte elektroner.'],
+ ['molekyl','To eller flere atomer som henger sammen fordi de deler elektroner.'],
+ ['kjemisk forbindelse','Stoff som er satt sammen av atomer fra minst to ulike grunnstoffer, for eksempel vann.'],
+ ['enkeltbinding','Binding der to atomer deler ett elektronpar.'],
+ ['dobbeltbinding','Binding der to atomer deler to elektronpar.'],
+ ['ion','Atom som har fått ladning fordi det har gitt fra seg eller tatt opp elektroner.'],
+ ['ionebinding','Binding som holder positive og negative ioner sammen, fordi motsatte ladninger trekker på hverandre.'],
+ ['salt','Stoff bygd opp av positive og negative ioner som ligger i et fast mønster.']
+].map(([begrep,forklaring])=>({begrep,forklaring}))};
+let bsSets={}, bsEditId=null, bsUnsub=null;
+const bsEsc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const bsList=v=>Array.isArray(v)?v.filter(Boolean):Object.values(v||{}).filter(Boolean);
+
+function loadBegrepssett(){
+  if(bsUnsub||!window._fbReady) return;
+  bsUnsub=window._onValue(window._ref(window._db,'begrepssett'),snap=>{ bsSets=snap.val()||{}; bsRender(); },
+    err=>{ document.getElementById('bsList').innerHTML='<div class="empty-state"><div class="icon">⚠️</div><p>Fikk ikke hentet begrepssettene ('+bsEsc(err.message)+').</p></div>'; });
+}
+function bsRender(){
+  const ids=Object.keys(bsSets);
+  document.getElementById('bsCount').textContent=ids.length+' sett';
+  const fagSet=new Set(BS_FAG), temaSet=new Set();
+  ids.forEach(id=>{ fagSet.add(bsSets[id].fag||''); temaSet.add(bsSets[id].tema||''); });
+  document.getElementById('bsFagList').innerHTML=[...fagSet].filter(Boolean).map(f=>'<option value="'+bsEsc(f)+'">').join('');
+  document.getElementById('bsTemaList').innerHTML=[...temaSet].filter(Boolean).map(f=>'<option value="'+bsEsc(f)+'">').join('');
+  const el=document.getElementById('bsList');
+  if(!ids.length){
+    el.innerHTML='<div class="empty-state"><div class="icon">📚</div><p>Ingen begrepssett ennå.</p>'+
+      '<button class="btn btn-ghost" style="margin-top:14px" onclick="bsImportKjemi()">Legg inn kjemisettet fra Begrepsjakten</button></div>';
+    return;
+  }
+  const tree={};
+  ids.forEach(id=>{ const s=bsSets[id]; const f=s.fag||'Uten fag', t=s.tema||'Uten tema';
+    ((tree[f]=tree[f]||{})[t]=tree[f][t]||[]).push(id); });
+  const cmp=(a,b)=>a.localeCompare(b,'nb');
+  el.innerHTML=Object.keys(tree).sort(cmp).map(f=>'<div class="bs-fag">'+bsEsc(f)+'</div>'+
+    Object.keys(tree[f]).sort(cmp).map(t=>'<div class="bs-tema">'+bsEsc(t)+'</div>'+
+      tree[f][t].sort((a,b)=>cmp(bsSets[a].navn||'',bsSets[b].navn||'')).map(id=>{
+        const s=bsSets[id], n=bsList(s.begreper).length;
+        return '<div class="bs-row"><span class="bs-name">'+bsEsc(s.navn||'(uten navn)')+'</span>'+
+          '<span class="bs-count">'+n+' begreper</span>'+
+          '<button class="btn btn-ghost btn-sm" onclick="bsEdit(\''+id+'\')">✏️ Rediger</button>'+
+          '<button class="btn btn-ghost btn-sm" onclick="bsConfirmDelete(\''+id+'\')">🗑️</button></div>';
+      }).join('')).join('')).join('');
+}
+function bsItemHtml(b='',f=''){
+  return '<div class="bs-item"><input class="styled-input bs-b" maxlength="60" value="'+bsEsc(b)+'" placeholder="Begrep">'+
+    '<textarea class="styled-input bs-f" maxlength="300" placeholder="Forklaring">'+bsEsc(f)+'</textarea>'+
+    '<button class="btn bs-del" title="Fjern" onclick="this.parentElement.remove()">✕</button></div>';
+}
+function bsOpen(title,s){
+  document.getElementById('bsEditorTitle').textContent=title;
+  document.getElementById('bsNavn').value=s.navn||'';
+  document.getElementById('bsFag').value=s.fag||'';
+  document.getElementById('bsTema').value=s.tema||'';
+  const items=bsList(s.begreper);
+  document.getElementById('bsItems').innerHTML=(items.length?items:[{},{},{}]).map(i=>bsItemHtml(i.begrep,i.forklaring)).join('');
+  document.getElementById('bsPaste').value='';
+  document.getElementById('bsEditor').style.display='';
+  document.getElementById('bsList').style.display='none';
+  document.getElementById('bsToolbar').style.display='none';
+  document.getElementById('bsNavn').focus();
+}
+window.bsNew=function(){ bsEditId=null; bsOpen('Nytt sett',{}); };
+window.bsEdit=function(id){ bsEditId=id; bsOpen('Rediger sett',bsSets[id]||{}); };
+window.bsClose=function(){
+  document.getElementById('bsEditor').style.display='none';
+  document.getElementById('bsList').style.display='';
+  document.getElementById('bsToolbar').style.display='';
+};
+window.bsAddItem=function(){
+  document.getElementById('bsItems').insertAdjacentHTML('beforeend',bsItemHtml());
+  const all=document.querySelectorAll('#bsItems .bs-b'); all[all.length-1].focus();
+};
+window.bsImportPaste=function(){
+  const lines=document.getElementById('bsPaste').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  let added=0;
+  // Fjern tomme rader før vi legger til
+  document.querySelectorAll('#bsItems .bs-item').forEach(r=>{ if(!r.querySelector('.bs-b').value.trim()&&!r.querySelector('.bs-f').value.trim()) r.remove(); });
+  lines.forEach(l=>{
+    const m=l.match(/^(.+?)\s*(?:\t|;|\s[–-]\s)\s*(.+)$/);
+    if(!m) return;
+    document.getElementById('bsItems').insertAdjacentHTML('beforeend',bsItemHtml(m[1].trim(),m[2].trim())); added++;
+  });
+  document.getElementById('bsPaste').value='';
+  showToast(added?added+' begreper lagt til – husk å lagre':'Fant ingen linjer med begrep og forklaring',added?'success':'error');
+};
+function bsSlug(t){
+  return (t||'sett').toLowerCase().replace(/æ/g,'ae').replace(/ø/g,'o').replace(/å/g,'a').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'sett';
+}
+window.bsSave=async function(){
+  const navn=document.getElementById('bsNavn').value.trim();
+  const fag=document.getElementById('bsFag').value.trim();
+  const tema=document.getElementById('bsTema').value.trim();
+  const begreper=[...document.querySelectorAll('#bsItems .bs-item')].map(r=>({
+    begrep:r.querySelector('.bs-b').value.trim(), forklaring:r.querySelector('.bs-f').value.trim()
+  })).filter(i=>i.begrep||i.forklaring);
+  if(!navn){ showToast('Settet må ha et navn','error'); return; }
+  if(!fag){ showToast('Velg eller skriv et fag','error'); return; }
+  const half=begreper.find(i=>!i.begrep||!i.forklaring);
+  if(half){ showToast('Alle begreper må ha både begrep og forklaring','error'); return; }
+  if(begreper.length<2){ showToast('Legg inn minst to begreper','error'); return; }
+  const lower=begreper.map(i=>i.begrep.toLowerCase());
+  const dup=lower.find((b,i)=>lower.indexOf(b)!==i);
+  if(dup){ showToast('«'+dup+'» står to ganger','error'); return; }
+  const id=bsEditId||bsSlug(navn)+'-'+Math.random().toString(36).slice(2,6);
+  try{
+    await window._set(window._ref(window._db,'begrepssett/'+id),{navn,fag,tema,begreper,endret:Date.now()});
+    showToast('Lagret «'+navn+'»','success'); bsClose();
+  }catch(e){ showToast('Kunne ikke lagre: '+e.message,'error'); }
+};
+window.bsConfirmDelete=function(id){
+  const s=bsSets[id]; if(!s) return;
+  document.getElementById('confirmTitle').textContent='Slette «'+(s.navn||id)+'»?';
+  document.getElementById('confirmText').textContent='Settet og alle begrepene i det slettes for godt.';
+  document.getElementById('confirmOkBtn').textContent='Slett';
+  document.getElementById('confirmOkBtn').onclick=async()=>{
+    closeConfirm();
+    try{ await window._remove(window._ref(window._db,'begrepssett/'+id)); showToast('Slettet','success'); }
+    catch(e){ showToast('Kunne ikke slette: '+e.message,'error'); }
+  };
+  document.getElementById('confirmOverlay').classList.add('show');
+};
+window.bsImportKjemi=async function(){
+  try{ await window._set(window._ref(window._db,'begrepssett/kjemi-naturfag'),{...BS_KJEMI,endret:Date.now()}); showToast('Kjemisettet er lagt inn','success'); }
+  catch(e){ showToast('Kunne ikke lagre: '+e.message,'error'); }
+};
 
 // ── TOAST ──
 function showToast(msg,type){

@@ -91,6 +91,10 @@ button{font-family:inherit;}
 @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
 .clue .meta{font-weight:900;color:var(--gold);font-size:clamp(1rem,2vw,1.6rem);text-transform:uppercase;letter-spacing:1px;}
 .clue .q{font-weight:800;font-size:clamp(1.6rem,4.2vw,3.6rem);line-height:1.25;max-width:1200px;text-shadow:0 3px 0 rgba(0,0,0,.3);}
+.clue .q{display:flex;flex-direction:column;align-items:center;gap:14px;}
+.clue .qimg{max-height:46vh;max-width:90vw;border-radius:14px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.35);}
+.clue .qsub{font-size:.7em;color:var(--muted);}
+.clue .aimg{display:block;margin:12px auto 0;max-height:24vh;max-width:60vw;border-radius:12px;background:#fff;}
 .clue .ans{font-weight:900;font-size:clamp(1.4rem,3.4vw,3rem);color:var(--gold);min-height:1.3em;}
 .clue .ans.ok{color:#86efac;}
 .clue .who{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
@@ -205,7 +209,7 @@ let clueState=null;          // {c,r,answering,tried:Set,done}
 const isOver=g=>g.cols.every(c=>c.cells.every(x=>!x||x.used));
 
 // ── LAGRING (bare på denne maskinen, slik at spillet tåler at siden lastes på nytt) ──
-function save(){ try{ G?localStorage.setItem(STORE,JSON.stringify(G)):localStorage.removeItem(STORE); }catch(e){} }
+function save(){ try{ G?localStorage.setItem(STORE,JSON.stringify(G)):localStorage.removeItem(STORE); }catch(e){ try{ localStorage.removeItem(STORE); }catch(_){} } }
 function loadSaved(){ try{ return JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){ return null; } }
 
 // ── OPPSETT ──
@@ -283,7 +287,7 @@ function buildBoard(cfg){
   return cfg.setIds.map(id=>{
     const s=cfg.snapshot[id];
     const picked=shuffle(listOf(s.begreper)).slice(0,cfg.rows);
-    return { navn:s.navn, cells:Array.from({length:cfg.rows},(_,r)=>picked[r]?{begrep:picked[r].begrep,forklaring:picked[r].forklaring,used:false}:null) };
+    return { navn:s.navn, cells:Array.from({length:cfg.rows},(_,r)=>picked[r]?{begrep:picked[r].begrep||'',forklaring:picked[r].forklaring||'',begrepBilde:picked[r].begrepBilde||'',forklaringBilde:picked[r].forklaringBilde||'',used:false}:null) };
   });
 }
 window.startGame=function(){
@@ -349,7 +353,8 @@ function openClue(c,r){
   const x=G.cols[c].cells[r];
   clueState={c,r,value:(r+1)*100,answering:null,tried:new Set(),done:false};
   $('clueMeta').textContent=G.cols[c].navn+' · '+clueState.value;
-  $('clueQ').textContent=x.forklaring;
+  $('clueQ').innerHTML=(x.forklaringBilde?'<img class="qimg" src="'+esc(x.forklaringBilde)+'" alt="">':'')+
+    (x.forklaring?'<div>'+esc(x.forklaring)+'</div>':'')+(x.forklaringBilde&&!x.forklaring?'<div class="qsub">Hva er dette?</div>':'');
   $('clueAns').textContent=''; $('clueAns').className='ans';
   $('clue').classList.remove('hidden');
   renderClueControls();
@@ -386,7 +391,8 @@ function judge(ok){
 function finishClue(winner){
   const s=clueState, x=G.cols[s.c].cells[s.r];
   x.used=true; s.done=true;
-  $('clueAns').innerHTML=(winner!==null?'✓ '+esc(G.teams[winner].navn)+': ':'Svar: ')+'<span style="text-transform:none">'+esc(x.begrep)+'</span>';
+  $('clueAns').innerHTML=(winner!==null?'✓ '+esc(G.teams[winner].navn)+': ':'Svar: ')+'<span style="text-transform:none">'+esc(x.begrep)+'</span>'+
+    (x.begrepBilde?'<img class="aimg" src="'+esc(x.begrepBilde)+'" alt="">':'');
   $('clueAns').className='ans'+(winner!==null?' ok':'');
   save(); renderClueControls();
 }

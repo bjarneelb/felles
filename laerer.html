@@ -137,12 +137,20 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .bs-grid .styled-input{width:100%;}
 .bs-item{display:grid;grid-template-columns:minmax(120px,1fr) 2.2fr auto;gap:8px;align-items:start;margin-bottom:8px;}
 .bs-item textarea{resize:vertical;min-height:42px;font-family:'Nunito',sans-serif;}
+.bs-side{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.bs-side .styled-input{width:100%;}
+.bs-imgbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.bs-imgbtn{padding:4px 10px;border-radius:8px;border:1px dashed var(--border);background:white;color:var(--muted);font-family:'Nunito',sans-serif;font-weight:800;font-size:0.75rem;cursor:pointer;}
+.bs-imgbtn:hover{border-color:var(--accent);color:var(--accent);}
+.bs-thumbwrap{position:relative;display:inline-block;}
+.bs-thumb{display:block;max-height:90px;max-width:160px;border-radius:8px;border:2px solid var(--border);}
+.bs-thumbx{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;border:none;background:#b91c1c;color:white;font-weight:900;font-size:0.7rem;cursor:pointer;}
 .bs-item .bs-del{padding:9px 11px;background:#fee2e2;color:#b91c1c;}
 .bs-head{display:grid;grid-template-columns:minmax(120px,1fr) 2.2fr 40px;gap:8px;}
 .bs-paste{margin-top:12px;font-size:0.85rem;font-weight:700;}
 .bs-paste summary{cursor:pointer;color:var(--accent);}
 .bs-paste textarea{width:100%;min-height:120px;margin-top:8px;font-family:'Nunito',sans-serif;}
-@media (max-width:600px){ .bs-item,.bs-head{grid-template-columns:1fr auto;} .bs-item textarea{grid-column:1/2;} .bs-head .input-label:nth-child(2){display:none;} }
+@media (max-width:600px){ .bs-item,.bs-head{grid-template-columns:1fr auto;} .bs-item .bs-side{grid-column:1;} .bs-item .bs-del{grid-column:2;grid-row:1;} .bs-head .input-label:nth-child(2){display:none;} .bs-item{border-bottom:1px solid var(--border);padding-bottom:10px;} }
 
 /* MISC */
 .empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
@@ -159,7 +167,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .btn-confirm-ok{flex:1;padding:11px;background:var(--red);color:white;border:none;border-radius:10px;font-family:'Nunito',sans-serif;font-weight:800;font-size:0.9rem;cursor:pointer;}
 .loading{text-align:center;padding:40px;color:var(--muted);font-weight:700;animation:pulse 1.2s infinite;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);padding:12px 24px;border-radius:50px;font-weight:800;font-size:0.95rem;color:white;z-index:500;transition:transform 0.4s cubic-bezier(.34,1.56,.64,1);pointer-events:none;white-space:nowrap;}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);padding:12px 24px;border-radius:50px;font-weight:800;font-size:0.95rem;color:white;z-index:500;transition:transform 0.4s cubic-bezier(.34,1.56,.64,1);pointer-events:none;max-width:92vw;text-align:center;}
 .toast.show{transform:translateX(-50%) translateY(0);}
 .toast.success{background:var(--green);}
 .toast.error{background:var(--red);}
@@ -199,7 +207,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.12</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.13</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -332,7 +340,9 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
         <div class="input-group"><div class="input-label">Tema</div><input class="styled-input" id="bsTema" list="bsTemaList" maxlength="40" placeholder="f.eks. Kjemi"></div>
       </div>
       <datalist id="bsFagList"></datalist><datalist id="bsTemaList"></datalist>
+      <div class="panel-sub" style="margin:-4px 0 10px">Begrep og forklaring kan være tekst, bilde eller begge. Legg til bilde med knappen, eller lim inn et skjermklipp (Ctrl+V) mens du står i feltet.</div>
       <div class="bs-head"><div class="input-label">Begrep</div><div class="input-label">Forklaring</div><div></div></div>
+      <input type="file" id="bsFile" accept="image/*" style="display:none">
       <div id="bsItems"></div>
       <button class="btn btn-ghost btn-sm" onclick="bsAddItem()">➕ Legg til begrep</button>
       <details class="bs-paste">
@@ -1174,18 +1184,66 @@ function bsRender(){
           '<button class="btn btn-ghost btn-sm" onclick="bsConfirmDelete(\''+id+'\')">🗑️</button></div>';
       }).join('')).join('')).join('');
 }
-function bsItemHtml(b='',f=''){
-  return '<div class="bs-item"><input class="styled-input bs-b" maxlength="60" value="'+bsEsc(b)+'" placeholder="Begrep">'+
-    '<textarea class="styled-input bs-f" maxlength="300" placeholder="Forklaring">'+bsEsc(f)+'</textarea>'+
+function bsSideHtml(kind,text,img){
+  const field=kind==='b'
+    ? '<input class="styled-input bs-b" maxlength="60" value="'+bsEsc(text)+'" placeholder="Begrep">'
+    : '<textarea class="styled-input bs-f" maxlength="300" placeholder="Forklaring">'+bsEsc(text)+'</textarea>';
+  return '<div class="bs-side" data-kind="'+kind+'">'+field+'<div class="bs-imgbar">'+bsThumbHtml(img)+'</div></div>';
+}
+function bsThumbHtml(img){
+  return img&&/^data:image\//.test(img)
+    ? '<span class="bs-thumbwrap"><img class="bs-thumb" src="'+img+'" alt=""><button class="bs-thumbx" title="Fjern bildet" onclick="bsSetImg(this,null)">✕</button></span>'
+    : '<button class="bs-imgbtn" onclick="bsPickImg(this)">🖼️ Bilde</button>';
+}
+function bsItemHtml(b='',f='',bImg='',fImg=''){
+  return '<div class="bs-item">'+bsSideHtml('b',b,bImg)+bsSideHtml('f',f,fImg)+
     '<button class="btn bs-del" title="Fjern" onclick="this.parentElement.remove()">✕</button></div>';
 }
+const bsImgOf=side=>{ const i=side.querySelector('.bs-thumb'); return i?i.getAttribute('src'):''; };
+window.bsSetImg=function(el,data){
+  const bar=el.closest('.bs-side').querySelector('.bs-imgbar');
+  bar.innerHTML=bsThumbHtml(data);
+};
+// Krymper bildet til maks 800 px og lagrer det som JPEG (ca. 50–150 kB)
+function bsShrink(file){
+  return new Promise((res,rej)=>{
+    if(!file||!/^image\//.test(file.type)){ rej(new Error('Filen er ikke et bilde')); return; }
+    const url=URL.createObjectURL(file), im=new Image();
+    im.onload=()=>{
+      const k=Math.min(1,800/Math.max(im.width,im.height));
+      const c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k);
+      const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(im,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      let q=0.82, d=c.toDataURL('image/jpeg',q);
+      while(d.length>200000&&q>0.4){ q-=0.12; d=c.toDataURL('image/jpeg',q); }
+      res(d);
+    };
+    im.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error('Kunne ikke lese bildet')); };
+    im.src=url;
+  });
+}
+let bsImgTarget=null;
+window.bsPickImg=function(btn){ bsImgTarget=btn; const f=document.getElementById('bsFile'); f.value=''; f.click(); };
+document.getElementById('bsFile').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file||!bsImgTarget) return;
+  try{ bsSetImg(bsImgTarget,await bsShrink(file)); }catch(err){ showToast(err.message,'error'); }
+  bsImgTarget=null;
+});
+document.getElementById('bsItems').addEventListener('paste',async e=>{
+  const side=e.target.closest&&e.target.closest('.bs-side'); if(!side) return;
+  const item=[...(e.clipboardData?.items||[])].find(i=>i.kind==='file'&&/^image\//.test(i.type));
+  if(!item) return;
+  e.preventDefault();
+  try{ bsSetImg(side.firstElementChild,await bsShrink(item.getAsFile())); showToast('Bildet er lagt til','success'); }
+  catch(err){ showToast(err.message,'error'); }
+});
 function bsOpen(title,s){
   document.getElementById('bsEditorTitle').textContent=title;
   document.getElementById('bsNavn').value=s.navn||'';
   document.getElementById('bsFag').value=s.fag||'';
   document.getElementById('bsTema').value=s.tema||'';
   const items=bsList(s.begreper);
-  document.getElementById('bsItems').innerHTML=(items.length?items:[{},{},{}]).map(i=>bsItemHtml(i.begrep,i.forklaring)).join('');
+  document.getElementById('bsItems').innerHTML=(items.length?items:[{},{},{}]).map(i=>bsItemHtml(i.begrep,i.forklaring,i.begrepBilde,i.forklaringBilde)).join('');
   document.getElementById('bsPaste').value='';
   document.getElementById('bsEditor').style.display='';
   document.getElementById('bsList').style.display='none';
@@ -1207,7 +1265,7 @@ window.bsImportPaste=function(){
   const lines=document.getElementById('bsPaste').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   let added=0;
   // Fjern tomme rader før vi legger til
-  document.querySelectorAll('#bsItems .bs-item').forEach(r=>{ if(!r.querySelector('.bs-b').value.trim()&&!r.querySelector('.bs-f').value.trim()) r.remove(); });
+  document.querySelectorAll('#bsItems .bs-item').forEach(r=>{ if(!r.querySelector('.bs-b').value.trim()&&!r.querySelector('.bs-f').value.trim()&&!r.querySelector('.bs-thumb')) r.remove(); });
   lines.forEach(l=>{
     const m=l.match(/^(.+?)\s*(?:\t|;|\s[–-]\s)\s*(.+)$/);
     if(!m) return;
@@ -1223,15 +1281,19 @@ window.bsSave=async function(){
   const navn=document.getElementById('bsNavn').value.trim();
   const fag=document.getElementById('bsFag').value.trim();
   const tema=document.getElementById('bsTema').value.trim();
-  const begreper=[...document.querySelectorAll('#bsItems .bs-item')].map(r=>({
-    begrep:r.querySelector('.bs-b').value.trim(), forklaring:r.querySelector('.bs-f').value.trim()
-  })).filter(i=>i.begrep||i.forklaring);
+  const begreper=[...document.querySelectorAll('#bsItems .bs-item')].map(r=>{
+    const [sb,sf]=r.querySelectorAll('.bs-side');
+    const o={begrep:r.querySelector('.bs-b').value.trim(), forklaring:r.querySelector('.bs-f').value.trim()};
+    const bi=bsImgOf(sb), fi=bsImgOf(sf);
+    if(bi) o.begrepBilde=bi; if(fi) o.forklaringBilde=fi;
+    return o;
+  }).filter(i=>i.begrep||i.forklaring||i.begrepBilde||i.forklaringBilde);
   if(!navn){ showToast('Settet må ha et navn','error'); return; }
   if(!fag){ showToast('Velg eller skriv et fag','error'); return; }
-  const half=begreper.find(i=>!i.begrep||!i.forklaring);
-  if(half){ showToast('Alle begreper må ha både begrep og forklaring','error'); return; }
+  const half=begreper.find(i=>!(i.begrep||i.begrepBilde)||!(i.forklaring||i.forklaringBilde));
+  if(half){ showToast('Alle rader må ha både begrep og forklaring (tekst eller bilde)','error'); return; }
   if(begreper.length<2){ showToast('Legg inn minst to begreper','error'); return; }
-  const lower=begreper.map(i=>i.begrep.toLowerCase());
+  const lower=begreper.map(i=>i.begrep.toLowerCase()).filter(Boolean);
   const dup=lower.find((b,i)=>lower.indexOf(b)!==i);
   if(dup){ showToast('«'+dup+'» står to ganger','error'); return; }
   const id=bsEditId||bsSlug(navn)+'-'+Math.random().toString(36).slice(2,6);

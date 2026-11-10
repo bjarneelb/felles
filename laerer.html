@@ -163,6 +163,10 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .rc-meta{font-size:0.72rem;font-weight:700;color:var(--muted);}
 .rc-live{color:#16a34a;}
 
+/* TID */
+.live-tid{font-size:0.7rem;color:var(--muted);font-weight:700;margin-top:5px;}
+.live-away{margin-top:6px;padding:3px 8px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:0.75rem;font-weight:900;display:inline-block;}
+
 /* MISC */
 .empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
 .empty-state .icon{font-size:3rem;margin-bottom:12px;}
@@ -218,7 +222,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.16</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.17</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -605,17 +609,27 @@ function updateLiveGrid(data){
       ? `<div style="font-size:0.72rem;color:var(--red);font-weight:700;margin-top:5px">⚠️ Inaktiv ${agoMin>=60?Math.floor(agoMin/60)+' t':agoMin+' min'}</div>`
       : (!isActive&&agoMin!==null?`<div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Sist aktiv: ${agoMin} min siden</div>`:'');
     const nick=p.nickname?` <span style="font-size:0.72rem;font-weight:700;color:var(--muted)">(${p.nickname})</span>`:'';
-    return `<div class="live-card ${isActive?'active':''}" ${inactive?'style="border-color:#fca5a5"':''}>
+    const t=tidInfo(p);
+    const awayNow=t&&t.borteNa&&(now-t.borteNa)>=5000&&tcIsLive(p);
+    const awayMin=awayNow?Math.floor((now-t.borteNa)/60000):0;
+    const tidRow=t?`<div class="live-tid">⏱️ ${t.aktiv} min aktiv · 🙈 ${t.antall}× borte (${t.borte} min)</div>`:'';
+    const awayBadge=awayNow?`<div class="live-away">🙈 Borte fra spillet ${awayMin<1?'nå':awayMin+' min'}</div>`:'';
+    return `<div class="live-card ${isActive&&!awayNow?'active':''}" ${awayNow?'style="border-color:#f59e0b;background:#fffbeb"':inactive?'style="border-color:#fca5a5"':''}>
       <div style="display:flex;align-items:center;gap:6px">
         <div class="live-name" style="flex:1">${name}${nick}</div>
         <div class="active-dot ${isActive?'active':'inactive'}"></div>
       </div>
+      ${awayBadge}
       ${gameNames.length?rows:'<div style="font-size:0.75rem;color:var(--muted);margin-top:4px">Ingen spill ennå</div>'}
+      ${tidRow}
       ${status}
     </div>`;
   }).join('');
 }
 
+// Borte-merket vises bare mens økta pågår (ikke for elever som gikk for en time siden)
+function tcIsLive(p){ const t=p.tid||{}; return Date.now()-Math.max(t.borteNa||0,t.oppdatert||0,p.lastSeen||0)<45*60000; }
+setInterval(()=>{ const el=document.getElementById('tab-live'); if(el&&el.classList.contains('active')) mergeAndUpdateLiveGrid(); },15000);
 function mergeAndUpdateLiveGrid(){
   const merged={};
   Object.values(tcPlayersCache).forEach(players=>{
@@ -978,6 +992,19 @@ let selectedRapportStudents=new Set();
 let rapportCodeLoaded='', rapportTexts={}, rapportPending=0, rapportReportNames=[];
 const rapportElId=name=>'rapport-'+name.replace(/[^A-Za-z0-9ÆØÅæøå_-]/g,'_');
 
+// Tid i spillet (fra spill-utils): {aktivMs, inaktivMs, borteMs, borteAntall, borteNa, oppdatert}
+const tidMin=ms=>Math.round((ms||0)/60000);
+function tidInfo(p){
+  const t=(p&&p.tid)||null; if(!t) return null;
+  let borteMs=t.borteMs||0;
+  if(t.borteNa) borteMs+=Math.max(0,Date.now()-t.borteNa);
+  return {aktiv:tidMin(t.aktivMs),inaktiv:tidMin(t.inaktivMs),borte:tidMin(borteMs),antall:(t.borteAntall||0)+(t.borteNa&&Date.now()-t.borteNa>=5000?1:0),borteNa:t.borteNa||null};
+}
+function tidTekst(p){
+  const t=tidInfo(p); if(!t) return 'Ingen tidsdata (eldre versjon av spillet eller ikke logget inn).';
+  return 'Aktiv '+t.aktiv+' min, inaktiv '+t.inaktiv+' min, borte fra spillet '+t.antall+' gang'+(t.antall===1?'':'er')+' (til sammen '+t.borte+' min).';
+}
+
 // ── NEDLASTING ──
 function rapportGameRows(name){
   const games=(rapportStudentData[name]||{}).games||{};
@@ -997,10 +1024,11 @@ window.downloadRapportCsv=function(){
   const names=(selectedRapportStudents.size?[...selectedRapportStudents]:Object.keys(rapportStudentData)).sort((a,b)=>a.localeCompare(b,'nb'));
   if(!names.length){ showToast('Ingen elever å laste ned','error'); return; }
   const q=v=>{ v=String(v??''); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-  const rows=[['Timekode','Elev','Kallenavn','Spill','Poeng','Riktige','Feil','Treff %','Nivå start','Nivå høyest','Nivå sist','Sett','Startet','Sist aktiv']];
-  names.forEach(n=>{ const p=rapportStudentData[n]||{}; const g=rapportGameRows(n);
-    if(!g.length) rows.push([rapportCodeLoaded,n,p.nickname||'','(ingen spill)','','','','','','','','','','']);
-    g.forEach(r=>rows.push([rapportCodeLoaded,n,p.nickname||'',r.spill,r.poeng,r.riktige,r.feil,r.pct,r.start,r.maks,r.sist,r.sett,rapportTime(r.startet),rapportTime(r.sistAktiv)]));
+  const rows=[['Timekode','Elev','Kallenavn','Aktiv min','Inaktiv min','Borte antall','Borte min','Spill','Poeng','Riktige','Feil','Treff %','Nivå start','Nivå høyest','Nivå sist','Sett','Startet','Sist aktiv']];
+  names.forEach(n=>{ const p=rapportStudentData[n]||{}; const g=rapportGameRows(n); const t=tidInfo(p);
+    const tc=t?[t.aktiv,t.inaktiv,t.antall,t.borte]:['','','',''];
+    if(!g.length) rows.push([rapportCodeLoaded,n,p.nickname||'',...tc,'(ingen spill)','','','','','','','','','','']);
+    g.forEach(r=>rows.push([rapportCodeLoaded,n,p.nickname||'',...tc,r.spill,r.poeng,r.riktige,r.feil,r.pct,r.start,r.maks,r.sist,r.sett,rapportTime(r.startet),rapportTime(r.sistAktiv)]));
   });
   rapportFile('rapport-'+rapportCodeLoaded+'-'+rapportStamp()+'.csv',rows.map(r=>r.map(q).join(';')).join('\r\n'),'text/csv;charset=utf-8');
 };
@@ -1013,6 +1041,7 @@ window.downloadRapportTxt=function(){
     L.push(n+(p.nickname?' ('+p.nickname+')':''));
     L.push('');
     const g=rapportGameRows(n);
+    L.push('Tid: '+tidTekst(p));
     if(!g.length) L.push('Ingen spill registrert.');
     g.forEach(r=>{
       let t='• '+r.spill+': '+r.riktige+' riktige, '+r.feil+' feil'+(r.pct!==''?' ('+r.pct+' %)':'')+', '+r.poeng+' poeng';
@@ -1079,7 +1108,7 @@ window.loadRapportStudents=async function(){
       <div style="flex:1">
         <div style="font-weight:800;font-size:0.9rem">${name}${p.nickname?` <span style="font-size:0.72rem;color:var(--muted)">(${p.nickname})</span>`:''}</div>
         <div style="font-size:0.75rem;color:var(--muted)">${summary}</div>
-        <div style="font-size:0.72rem;color:var(--muted)">${totalCorrect} riktige · ${totalWrong} feil</div>
+        <div style="font-size:0.72rem;color:var(--muted)">${totalCorrect} riktige · ${totalWrong} feil${(()=>{const t=tidInfo(p);return t?` · ⏱️ ${t.aktiv} min aktiv · 🙈 borte ${t.antall}× (${t.borte} min)`:''})()}</div>
       </div>`;
     list.appendChild(div);
   });
@@ -1118,7 +1147,7 @@ window.generateRapport=async function(){
     div.className='rapport-elev';
     div.innerHTML=`
       <div class="rapport-elev-name">👤 ${name}</div>
-      <div class="rapport-elev-stats">${stats}</div>
+      <div class="rapport-elev-stats">${stats}<br>⏱️ ${tidTekst(p)}</div>
       <div class="rapport-loading" id="${rapportElId(name)}">Genererer vurdering...</div>`;
     output.appendChild(div);
     generateAIRapport(name,p).finally(()=>{ rapportPending=Math.max(0,rapportPending-1); updateRapportDl(); });
@@ -1170,6 +1199,7 @@ Eleven jobbet med følgende i denne timen:
 ${gameSummary||'Ingen data tilgjengelig'}
 
 Totalt: ${totalCorrect} riktige av ${totalTasks} oppgaver (${totalPct}%)${activityNote}
+Tidsbruk: ${tidTekst(p)} (Borte betyr at spillvinduet ikke var i fokus, for eksempel fordi eleven byttet vindu eller fane. Nevn dette nøkternt hvis det er påfallende, uten å trekke bastante konklusjoner.)
 
 Her er et eksempel på ønsket format (om en annen elev):
 ---

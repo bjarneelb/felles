@@ -1,4 +1,4 @@
-// ── spill-utils.js v2.3 ──
+// ── spill-utils.js v2.4 ──
 // Felles hjelpefunksjoner for alle fagsider og spill.
 //
 // VIKTIG: Lastes i <head>, FØR spillets egen kode:
@@ -268,7 +268,76 @@ function addPlayerChrome(){
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',addPlayerChrome);
 else addPlayerChrome();
 
+// ── TID I SPILLET ──
+// Måler hvor lenge eleven er aktiv, inaktiv og borte fra spillet (bytter vindu/fane, minimerer,
+// låser skjermen). Siden vet bare at den mister fokus, ikke hva eleven gjør ellers.
+// Lagres under timecodes/KODE/players/NAVN/tid = {aktivMs, inaktivMs, borteMs, borteAntall, borteNa, oppdatert}
+const SU_TID={IDLE_MS:90000, MIN_BORTE_MS:5000, SYNC_MS:15000};
+function startTidMaling(){
+  const s=getActiveSession();
+  if(!s||!s.name) return;
+  const key='su_tid_'+s.code;
+  let T={aktivMs:0,inaktivMs:0,borteMs:0,borteAntall:0};
+  try{ Object.assign(T,JSON.parse(sessionStorage.getItem(key)||'{}')); }catch(e){}
+  let lastInput=Date.now(), lastTick=Date.now(), borteFra=null, dirty=true, lastSync=0;
+  const here=()=>document.visibilityState==='visible'&&document.hasFocus();
+  const path=()=>window._ref(window._db,'timecodes/'+s.code+'/players/'+s.name+'/tid');
+  function save(){ try{ sessionStorage.setItem(key,JSON.stringify(T)); }catch(e){} }
+  function sync(extra){
+    lastSync=Date.now(); dirty=false;
+    whenFb(()=>window._update(path(),Object.assign({aktivMs:Math.round(T.aktivMs),inaktivMs:Math.round(T.inaktivMs),
+      borteMs:Math.round(T.borteMs),borteAntall:T.borteAntall,borteNa:borteFra,oppdatert:Date.now()},extra||{})));
+  }
+  function tick(){
+    const now=Date.now(), dt=Math.min(now-lastTick,5000); lastTick=now;
+    if(borteFra===null){
+      if(now-lastInput<SU_TID.IDLE_MS) T.aktivMs+=dt; else T.inaktivMs+=dt;
+      dirty=true;
+    }
+    if(now-lastSync>=SU_TID.SYNC_MS&&dirty){ save(); sync(); }
+  }
+  function gone(){
+    if(borteFra!==null) return;
+    tick(); borteFra=Date.now(); save(); sync();
+  }
+  function back(){
+    if(borteFra===null||!here()) return;
+    const dur=Date.now()-borteFra;
+    if(dur>=SU_TID.MIN_BORTE_MS){ T.borteMs+=dur; T.borteAntall++; }
+    else T.aktivMs+=dur; // korte blink regnes som at eleven var her
+    borteFra=null; lastTick=lastInput=Date.now(); save(); sync();
+  }
+  ['pointerdown','keydown','touchstart','wheel','mousemove'].forEach(ev=>
+    window.addEventListener(ev,()=>{ lastInput=Date.now(); back(); },{passive:true,capture:true}));
+  window.addEventListener('blur',gone);
+  window.addEventListener('focus',back);
+  document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'?back():gone());
+  // Siden lukkes eller eleven går til et annet spill: merk som borte. Neste side nullstiller dette.
+  window.addEventListener('pagehide',()=>{ if(borteFra===null){ tick(); save(); sync({borteNa:Date.now()}); } });
+  setInterval(tick,1000);
+  if(!here()) borteFra=Date.now();
+  sync();
+}
+// Kort beskjed til eleven om at tiden registreres
+const SU_TID_TEKST='⏱️ Læreren ser hvor lenge du er aktiv i spillet.';
+function addTidNotice(){
+  if(!getActiveSession()) return;
+  const slot=document.getElementById('suTidNote');
+  if(slot){ slot.textContent=SU_TID_TEKST; slot.style.display=''; return; }
+  const card=document.querySelector('#startScreen .start-card, #lobbyScreen .screen-card');
+  if(card&&!card.querySelector('.su-tid-note')){
+    const d=document.createElement('div');
+    d.className='su-tid-note';
+    d.style.cssText='margin:10px 0 0;font-weight:700;font-size:0.8rem;color:#64748b;';
+    d.textContent=SU_TID_TEKST;
+    const menu=card.querySelector('.su-start-menu');
+    if(menu) card.insertBefore(d,menu); else card.appendChild(d);
+  }
+}
+function suTidInit(){ try{ startTidMaling(); addTidNotice(); }catch(e){} }
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',suTidInit); else suTidInit();
+
 // Originalene, så spill som lager egne versjoner fortsatt kan bruke dem
 window.SU={generateNickname,readSession,getActiveSession,getNickname,whenFb,syncToTimecode,syncToTimecodeGeneric,
   levelTracker,initRoom,syncRoomScore,showMatchOverToast,showToast,getRoomBadgeHTML,buildLevelSelect,selectMode,
-  recordResult,changeLevel,addPlayerChrome,menuHref};
+  recordResult,changeLevel,addPlayerChrome,menuHref,startTidMaling};

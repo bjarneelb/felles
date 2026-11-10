@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Begrepsbingo</title>
+<script>
+// Bare for lærere: uten innlogging på lærersiden sendes man dit
+(function(){
+  let ok=false;
+  try{
+    ok=sessionStorage.getItem('teacher_auth_v1')==='true';
+    const r=JSON.parse(localStorage.getItem('teacher_remember_v1')||'null');
+    if(r&&r.until>Date.now()) ok=true;
+  }catch(e){}
+  if(!ok) location.replace('../laerer.html');
+})();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#2a0d3f; --panel:#3b1659; --cell:#4c1d74; --gold:#fde047; --text:#fff; --muted:#d8c4ee; --line:#6b3a96;
+  --green:#22c55e; --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Nunito',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+button{font-family:inherit;}
+.hidden{display:none !important;}
+.top{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#1d0830;border-bottom:2px solid var(--line);flex-wrap:wrap;}
+.top h1{font-size:1.3rem;font-weight:900;color:var(--gold);flex:1;}
+.tbtn{padding:7px 14px;border-radius:10px;border:1px solid var(--line);background:#33124f;color:var(--text);font-weight:800;font-size:.85rem;cursor:pointer;text-decoration:none;}
+.tbtn:hover{background:#45196a;}
+
+.setup{width:100%;max-width:980px;margin:0 auto;padding:24px 20px 40px;display:flex;flex-direction:column;gap:20px;}
+.box{background:var(--panel);border:2px solid var(--line);border-radius:var(--r);padding:18px 20px;}
+.box h2{font-size:.78rem;text-transform:uppercase;letter-spacing:2px;color:var(--muted);font-weight:900;margin-bottom:12px;}
+.hint{color:var(--muted);font-weight:700;font-size:.9rem;}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.chip{padding:6px 14px;border-radius:20px;border:2px solid var(--line);background:transparent;color:var(--text);font-weight:800;font-size:.85rem;cursor:pointer;}
+.chip.on{background:var(--gold);border-color:var(--gold);color:#222;}
+.grp{font-size:.8rem;font-weight:800;color:var(--muted);margin:10px 0 6px;}
+.sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;}
+.set{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;border:2px solid var(--line);background:#33124f;color:var(--text);font-weight:800;cursor:pointer;text-align:left;}
+.set.on{border-color:var(--gold);background:#4a3a10;}
+.set small{color:var(--muted);}
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:center;}
+.seg{display:flex;border:2px solid var(--line);border-radius:10px;overflow:hidden;}
+.seg button{padding:8px 16px;border:none;background:#2b0f44;color:var(--text);font-weight:900;cursor:pointer;}
+.seg button.on{background:var(--gold);color:#222;}
+.seg button:disabled{opacity:.3;cursor:not-allowed;}
+.big{padding:14px 28px;border-radius:14px;border:none;background:var(--gold);color:#222;font-weight:900;font-size:1.1rem;cursor:pointer;}
+.big:disabled{opacity:.4;cursor:not-allowed;}
+.big.ghost{background:transparent;color:var(--text);border:2px solid var(--line);}
+.err{color:#fca5a5;font-weight:800;min-height:1.2em;}
+.inp{padding:9px 12px;border-radius:10px;border:2px solid var(--line);background:#2b0f44;color:var(--text);font-weight:800;font-size:1rem;width:90px;font-family:inherit;}
+
+/* SPILL */
+.game{flex:1;display:grid;grid-template-columns:1fr 320px;gap:16px;padding:16px;min-height:0;}
+.stage{display:flex;flex-direction:column;gap:14px;min-width:0;}
+.joinbar{display:flex;align-items:center;gap:16px;background:var(--panel);border-radius:var(--r);padding:12px 18px;flex-wrap:wrap;}
+.joinbar .code{font-size:2.4rem;font-weight:900;letter-spacing:8px;color:var(--gold);}
+.joinbar .url{font-weight:800;color:var(--muted);font-size:1rem;}
+.joinbar .url b{color:var(--text);}
+.joinbar .np{margin-left:auto;font-weight:900;font-size:1.1rem;}
+.clue{flex:1;background:var(--cell);border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 4vw;gap:18px;min-height:280px;position:relative;}
+.clue .num{position:absolute;top:14px;left:18px;font-weight:900;color:var(--muted);font-size:1rem;}
+.clue .lvl{position:absolute;top:14px;right:18px;font-weight:900;color:var(--gold);font-size:1rem;}
+.clue .q{font-size:clamp(1.6rem,3.8vw,3.4rem);font-weight:800;line-height:1.25;max-width:1100px;}
+.clue img{max-height:40vh;max-width:90%;border-radius:14px;background:#fff;}
+.clue .idle{font-size:clamp(1.3rem,2.6vw,2rem);color:var(--muted);font-weight:800;}
+.clue .ans{font-size:clamp(1.1rem,2.2vw,1.7rem);color:var(--gold);font-weight:900;}
+.ctrl{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.side{display:flex;flex-direction:column;gap:12px;min-height:0;}
+.panel{background:var(--panel);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-height:0;}
+.panel h3{font-size:.75rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:900;}
+.wlist{display:flex;flex-direction:column;gap:4px;overflow:auto;max-height:30vh;}
+.w{display:flex;justify-content:space-between;gap:8px;font-weight:800;padding:4px 8px;border-radius:8px;background:#2b0f44;}
+.w .l{color:var(--gold);font-size:.85rem;}
+.drawn{overflow:auto;max-height:36vh;display:flex;flex-direction:column;gap:3px;font-weight:700;font-size:.88rem;}
+.drawn .d{padding:3px 8px;border-radius:6px;background:#2b0f44;display:flex;gap:8px;}
+.drawn .d span:first-child{color:var(--muted);min-width:1.8em;}
+.banner{position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:60;background:var(--gold);color:#222;border-radius:24px;padding:22px 40px;font-weight:900;font-size:clamp(1.6rem,4vw,3.2rem);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.45);animation:pop .35s ease;}
+.banner small{display:block;font-size:.45em;margin-top:6px;}
+@keyframes pop{from{transform:translateX(-50%) scale(.5);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+.end{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:30px;}
+.end h2{font-size:clamp(2rem,5vw,3.4rem);color:var(--gold);}
+
+@media (max-width:900px){ .game{grid-template-columns:1fr;} }
+
+/* UTSKRIFT */
+#printArea{display:none;}
+@media print{
+  @page{size:A4;margin:12mm;}
+  body{background:#fff;color:#000;display:block;}
+  body>*:not(#printArea){display:none !important;}
+  #printArea{display:block;}
+  .pb{page-break-inside:avoid;break-inside:avoid;margin-bottom:10mm;}
+  .pb h4{font-size:12pt;margin-bottom:3mm;display:flex;justify-content:space-between;font-family:'Nunito',sans-serif;}
+  .pb table{border-collapse:collapse;width:100%;table-layout:fixed;}
+  .pb td{border:1.5pt solid #000;text-align:center;vertical-align:middle;font-family:'Nunito',sans-serif;font-weight:800;padding:2mm;word-break:break-word;}
+  .pb td img{max-width:100%;max-height:22mm;}
+  .pb.s3 td{height:38mm;font-size:15pt;} .pb.s4 td{height:28mm;font-size:12pt;} .pb.s5 td{height:23mm;font-size:10pt;}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>🎱 Begrepsbingo</h1>
+  <button class="tbtn" onclick="toggleFs()">⛶ Fullskjerm</button>
+  <button class="tbtn hidden" id="printBtn2" onclick="printBoards()">🖨️ Skriv ut brett</button>
+  <button class="tbtn hidden" id="stopBtn" onclick="stopGame()">■ Avslutt spillet</button>
+  <a class="tbtn" href="../laerer.html">← Lærerside</a>
+</div>
+
+<!-- OPPSETT -->
+<div class="setup" id="setup">
+  <div class="box hidden" id="resumeBox">
+    <h2>Spill i gang</h2>
+    <div class="row"><span class="hint" id="resumeInfo" style="flex:1"></span><button class="big" onclick="resume()">▶ Fortsett</button></div>
+  </div>
+  <div class="box">
+    <h2>1. Velg begrepssett</h2>
+    <div class="chips" id="fagChips"></div>
+    <div id="setList"><div class="hint">Henter begrepssett …</div></div>
+  </div>
+  <div class="box">
+    <h2>2. Brettstørrelse</h2>
+    <div class="row">
+      <div class="seg" id="sizeSeg"><button data-v="3">3 × 3</button><button data-v="4" class="on">4 × 4</button><button data-v="5">5 × 5</button></div>
+      <span class="hint" id="sizeHint"></span>
+    </div>
+  </div>
+  <div class="box">
+    <h2>3. Papirbrett (valgfritt)</h2>
+    <div class="row">
+      <span class="hint">Antall brett:</span><input class="inp" id="printCount" type="number" min="1" max="60" value="10">
+      <button class="big ghost" id="printBtn" onclick="printBoards()" disabled>🖨️ Skriv ut brett</button>
+      <span class="hint">Til elever uten enhet. Hvert brett er tilfeldig og har et nummer.</span>
+    </div>
+  </div>
+  <div class="row" style="justify-content:space-between">
+    <div class="err" id="setupErr"></div>
+    <button class="big" id="startBtn" onclick="startGame()" disabled>Start bingo →</button>
+  </div>
+</div>
+
+<!-- SPILL -->
+<div class="game hidden" id="game">
+  <div class="stage">
+    <div class="joinbar">
+      <div><div class="url">Gå til <b>laerespill.netlify.app</b> → Flerfaglig → Begrepsbingo</div><div class="url">og skriv koden:</div></div>
+      <div class="code" id="gCode"></div>
+      <div class="np" id="gPlayers"></div>
+    </div>
+    <div class="clue" id="clue">
+      <div class="num" id="gNum"></div>
+      <div class="lvl" id="gLvl"></div>
+      <div class="idle" id="gIdle">Trykk «Vis neste forklaring» når alle har fått brett.</div>
+      <div id="gQ"></div>
+      <div class="ans hidden" id="gAns"></div>
+    </div>
+    <div class="ctrl">
+      <button class="big" id="nextBtn" onclick="nextClue()">▶ Vis neste forklaring</button>
+      <button class="big ghost" id="ansBtn" onclick="toggleAns()">👁 Vis begrepet</button>
+      <button class="big ghost" id="lvlBtn" onclick="raiseLevel()">Neste: 2 rader</button>
+    </div>
+  </div>
+  <div class="side">
+    <div class="panel">
+      <h3>Bingo</h3>
+      <div class="wlist" id="gWinners"><span class="hint">Ingen ennå.</span></div>
+    </div>
+    <div class="panel" style="flex:1">
+      <h3>Vist så langt (<span id="gDrawnN">0</span>) <button class="tbtn" style="float:right;padding:2px 8px;font-size:.7rem" onclick="toggleDrawn()" id="drawnToggle">Vis begreper</button></h3>
+      <div class="drawn" id="gDrawn"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SLUTT -->
+<div class="end hidden" id="end">
+  <h2>🎱 Bingo er ferdig</h2>
+  <div class="panel" style="min-width:min(520px,90vw)"><h3>Alle som fikk bingo</h3><div class="wlist" id="endWinners" style="max-height:50vh"></div></div>
+  <button class="big" onclick="toSetup()">Ny bingo</button>
+</div>
+
+<div class="banner hidden" id="banner"></div>
+<div id="printArea"></div>
+
+<script type="module">
+  import { database, ref, get, set, update, onValue, remove } from "../js/firebase-config.js";
+  Object.assign(window,{_db:database,_ref:ref,_get:get,_set:set,_update:update,_onValue:onValue,_remove:remove,_fbReady:true});
+  window.dispatchEvent(new Event('fbready'));
+</script>
+
+<script>
+const STORE='bingo_host_v1', OLD_MS=6*36e5;
+const $=id=>document.getElementById(id);
+const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const listOf=v=>Array.isArray(v)?v.filter(Boolean):Object.values(v||{}).filter(Boolean);
+const numList=v=>(Array.isArray(v)?v:Object.values(v||{})).filter(x=>x!==null&&x!==undefined).map(Number);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const cmp=(a,b)=>String(a).localeCompare(String(b),'nb');
+
+let sets={}, chosen=null, fagFilter='', size=4;
+let code=null, G=null, unsub=null, showAns=false, showDrawn=false, seenWins=new Set(), bannerTimer=null;
+
+function whenReady(cb){ if(window._fbReady) cb(); else window.addEventListener('fbready',cb,{once:true}); }
+const gref=p=>window._ref(window._db,'bingo/'+code+(p?'/'+p:''));
+
+// ── OPPSETT ──
+whenReady(()=>{
+  window._get(window._ref(window._db,'begrepssett')).then(s=>{ sets=s.val()||{}; renderSets(); })
+    .catch(e=>{ $('setList').innerHTML='<div class="err">Fikk ikke hentet begrepssett: '+esc(e.message)+'</div>'; });
+  let saved=null; try{ saved=localStorage.getItem(STORE); }catch(e){}
+  if(saved) window._get(window._ref(window._db,'bingo/'+saved)).then(s=>{
+    const g=s.val();
+    if(g&&g.status==='play'){ $('resumeInfo').textContent=g.settNavn+' · kode '+saved+' · '+numList(g.drawn).length+' forklaringer vist'; $('resumeBox').classList.remove('hidden'); $('resumeBox').dataset.code=saved; }
+  });
+});
+function renderSets(){
+  const ids=Object.keys(sets).filter(id=>listOf(sets[id].begreper).length>=9);
+  if(!ids.length){ $('setList').innerHTML='<div class="hint">Ingen sett med minst 9 begreper. Lag sett under «📚 Begrepssett» på <a href="../laerer.html" style="color:var(--gold)">lærersiden</a>.</div>'; return; }
+  const fags=[...new Set(ids.map(id=>sets[id].fag||'Uten fag'))].sort(cmp);
+  $('fagChips').innerHTML=['',...fags].map(f=>'<button class="chip'+(f===fagFilter?' on':'')+'" data-f="'+esc(f)+'">'+(f?esc(f):'Alle fag')+'</button>').join('');
+  $('fagChips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ fagFilter=b.dataset.f; renderSets(); });
+  const groups={};
+  ids.filter(id=>!fagFilter||(sets[id].fag||'Uten fag')===fagFilter)
+     .forEach(id=>{ const k=(sets[id].fag||'Uten fag')+' · '+(sets[id].tema||'Uten tema'); (groups[k]=groups[k]||[]).push(id); });
+  $('setList').innerHTML=Object.keys(groups).sort(cmp).map(k=>'<div class="grp">'+esc(k)+'</div><div class="sets">'+
+    groups[k].sort((a,b)=>cmp(sets[a].navn,sets[b].navn)).map(id=>'<button class="set'+(id===chosen?' on':'')+'" data-id="'+esc(id)+'">'+esc(sets[id].navn)+'<small>'+listOf(sets[id].begreper).length+'</small></button>').join('')+'</div>').join('');
+  $('setList').querySelectorAll('.set').forEach(b=>b.onclick=()=>{ chosen=b.dataset.id; renderSets(); });
+  updateSize();
+}
+function updateSize(){
+  const n=chosen?listOf(sets[chosen].begreper).length:0;
+  $('sizeSeg').querySelectorAll('button').forEach(b=>{ const v=+b.dataset.v; b.disabled=!!chosen&&v*v>n; });
+  if(chosen&&size*size>n) size=[5,4,3].find(v=>v*v<=n)||3;
+  $('sizeSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===size));
+  $('sizeHint').textContent=chosen?(n===size*size?'Settet har akkurat '+n+' begreper, så alle brett får de samme begrepene i ulik rekkefølge.':'Hvert brett får '+size*size+' av de '+n+' begrepene.'):'';
+  $('startBtn').disabled=!chosen; $('printBtn').disabled=!chosen;
+}
+$('sizeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ size=+b.dataset.v; updateSize(); });
+
+// ── SPILL ──
+function newCode(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ'; return Array.from({length:4},()=>c[Math.floor(Math.random()*c.length)]).join(''); }
+const itemsFrom=id=>listOf(sets[id].begreper).map(i=>{ const o={begrep:i.begrep||'',forklaring:i.forklaring||''};
+  if(i.begrepBilde) o.begrepBilde=i.begrepBilde; if(i.forklaringBilde) o.forklaringBilde=i.forklaringBilde; return o; });
+window.startGame=async function(){
+  if(!chosen) return;
+  $('startBtn').disabled=true;
+  try{
+    const all=(await window._get(window._ref(window._db,'bingo'))).val()||{};
+    Object.keys(all).forEach(k=>{ if(!all[k]||!all[k].created||Date.now()-all[k].created>OLD_MS) window._remove(window._ref(window._db,'bingo/'+k)); });
+    let c=newCode(); for(let i=0;i<10&&all[c];i++) c=newCode();
+    code=c;
+    await window._set(gref(),{settNavn:sets[chosen].navn,items:itemsFrom(chosen),size,level:1,status:'play',created:Date.now(),order:shuffle(listOf(sets[chosen].begreper).map((_,i)=>i))});
+    try{ localStorage.setItem(STORE,code); }catch(e){}
+    listen();
+  }catch(e){ $('setupErr').textContent='Kunne ikke starte: '+e.message; $('startBtn').disabled=false; }
+};
+window.resume=function(){ code=$('resumeBox').dataset.code; listen(); };
+function listen(){
+  seenWins=new Set(); let first=true;
+  if(unsub) unsub();
+  unsub=window._onValue(gref(),snap=>{
+    G=snap.val();
+    if(!G){ toSetup(); return; }
+    // Bingoer som fantes før vi åpnet siden, skal ikke gi banner
+    if(first){ winList().forEach(w=>seenWins.add(w.key)); first=false; }
+    render();
+  });
+}
+function winList(){
+  const out=[]; const w=G.winners||{};
+  Object.keys(w).forEach(l=>Object.entries(w[l]||{}).forEach(([n,ts])=>out.push({lvl:+l,n,ts,key:l+'|'+n})));
+  return out.sort((a,b)=>a.ts-b.ts);
+}
+function render(){
+  if(G.status==='done'){ showEnd(); return; }
+  $('setup').classList.add('hidden'); $('end').classList.add('hidden'); $('game').classList.remove('hidden');
+  $('stopBtn').classList.remove('hidden'); $('printBtn2').classList.remove('hidden');
+  $('gCode').textContent=code;
+  const np=Object.keys(G.players||{}).length;
+  $('gPlayers').textContent='👥 '+np+' spiller'+(np===1?'':'e');
+  const drawn=numList(G.drawn), items=G.items;
+  $('gLvl').textContent='Bingo nå: '+G.level+' rad'+(G.level>1?'er':'');
+  $('lvlBtn').textContent='Neste: '+(G.level+1)+' rader';
+  $('lvlBtn').disabled=G.level>=size2Max();
+  $('nextBtn').disabled=drawn.length>=items.length;
+  $('nextBtn').textContent=drawn.length>=items.length?'Alle forklaringer er vist':'▶ Vis neste forklaring';
+  if(drawn.length){
+    const it=items[drawn[drawn.length-1]];
+    $('gIdle').classList.add('hidden');
+    $('gNum').textContent='Nr. '+drawn.length+' av '+items.length;
+    $('gQ').innerHTML=(it.forklaringBilde?'<img src="'+esc(it.forklaringBilde)+'" alt="">':'')+(it.forklaring?'<div class="q">'+esc(it.forklaring)+'</div>':'');
+    $('gAns').textContent=it.begrep||'(bilde)';
+    $('gAns').classList.toggle('hidden',!showAns);
+  } else { $('gIdle').classList.remove('hidden'); $('gNum').textContent=''; $('gQ').innerHTML=''; $('gAns').classList.add('hidden'); }
+  $('ansBtn').textContent=showAns?'🙈 Skjul begrepet':'👁 Vis begrepet';
+  $('gDrawnN').textContent=drawn.length;
+  $('gDrawn').innerHTML=drawn.slice().reverse().map((d,k)=>'<div class="d"><span>'+(drawn.length-k)+'.</span><span>'+
+    esc(showDrawn?(items[d].begrep||'(bilde)'):(items[d].forklaring||'(bilde)').slice(0,60)+((items[d].forklaring||'').length>60?'…':''))+'</span></div>').join('');
+  $('drawnToggle').textContent=showDrawn?'Vis forklaringer':'Vis begreper';
+  const wins=winList();
+  $('gWinners').innerHTML=wins.length?wins.map(w=>'<div class="w"><span>🐾 '+esc(w.n)+'</span><span class="l">'+w.lvl+' rad'+(w.lvl>1?'er':'')+'</span></div>').join(''):'<span class="hint">Ingen ennå.</span>';
+  const fresh=wins.filter(w=>!seenWins.has(w.key));
+  fresh.forEach(w=>seenWins.add(w.key));
+  if(fresh.length) showBanner(fresh);
+}
+// Antall mulige rader på brettet: vannrette + loddrette + 2 diagonaler
+const size2Max=()=>G.size*2+2;
+function showBanner(list){
+  const lvl=list[0].lvl;
+  $('banner').innerHTML='🎉 BINGO!<small>'+list.map(w=>esc(w.n)).join(', ')+' · '+lvl+' rad'+(lvl>1?'er':'')+'</small>';
+  $('banner').classList.remove('hidden');
+  clearTimeout(bannerTimer); bannerTimer=setTimeout(()=>$('banner').classList.add('hidden'),4500);
+}
+window.nextClue=function(){
+  const drawn=numList(G.drawn); if(drawn.length>=G.items.length) return;
+  const order=numList(G.order);
+  const nxt=order.find(i=>!drawn.includes(i));
+  showAns=false;
+  window._update(gref(),{drawn:drawn.concat(nxt),lastAt:Date.now()});
+};
+window.toggleAns=function(){ showAns=!showAns; render(); };
+window.toggleDrawn=function(){ showDrawn=!showDrawn; render(); };
+window.raiseLevel=function(){ if(G.level<size2Max()) window._update(gref(),{level:G.level+1}); };
+window.stopGame=function(){ if(confirm('Avslutte bingoen?')) window._update(gref(),{status:'done'}); };
+function showEnd(){
+  $('game').classList.add('hidden'); $('end').classList.remove('hidden'); $('stopBtn').classList.add('hidden');
+  try{ localStorage.removeItem(STORE); }catch(e){}
+  const wins=winList();
+  $('endWinners').innerHTML=wins.length?wins.map(w=>'<div class="w"><span>🐾 '+esc(w.n)+'</span><span class="l">'+w.lvl+' rad'+(w.lvl>1?'er':'')+'</span></div>').join(''):'<span class="hint">Ingen fikk bingo denne gangen.</span>';
+}
+window.toSetup=function(){
+  if(unsub) unsub(); unsub=null; code=null; G=null;
+  ['game','end'].forEach(id=>$(id).classList.add('hidden')); $('setup').classList.remove('hidden');
+  $('stopBtn').classList.add('hidden'); $('printBtn2').classList.add('hidden'); $('resumeBox').classList.add('hidden');
+  $('startBtn').disabled=!chosen;
+};
+
+// ── PAPIRBRETT ──
+window.printBoards=function(){
+  const items=G?G.items:(chosen?itemsFrom(chosen):null); if(!items) return;
+  const s=G?G.size:size, navn=G?G.settNavn:sets[chosen].navn;
+  const n=Math.max(1,Math.min(60,+$('printCount').value||10));
+  let h='';
+  for(let b=1;b<=n;b++){
+    const pick=shuffle(items.map((_,i)=>i)).slice(0,s*s);
+    h+='<div class="pb s'+s+'"><h4><span>🎱 Begrepsbingo · '+esc(navn)+'</span><span>Brett nr. '+b+'</span></h4><table>';
+    for(let r=0;r<s;r++){ h+='<tr>'; for(let c=0;c<s;c++){ const it=items[pick[r*s+c]];
+      h+='<td>'+(it.begrepBilde?'<img src="'+esc(it.begrepBilde)+'" alt=""><br>':'')+esc(it.begrep)+'</td>'; } h+='</tr>'; }
+    h+='</table></div>';
+  }
+  $('printArea').innerHTML=h;
+  setTimeout(()=>window.print(),100);
+};
+
+window.toggleFs=function(){
+  if(document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen().catch(()=>{});
+};
+</script>
+</body>
+</html>

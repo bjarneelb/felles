@@ -163,6 +163,17 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .rc-meta{font-size:0.72rem;font-weight:700;color:var(--muted);}
 .rc-live{color:#16a34a;}
 
+/* LIVE: NÅ OG GRUPPER */
+.live-toolbar{display:flex;justify-content:flex-end;}
+.live-now{margin-top:6px;padding:4px 8px;border-radius:8px;background:#eef2ff;color:#3730a3;font-size:0.75rem;font-weight:800;line-height:1.4;}
+.live-group{grid-column:1/-1;background:white;border:2px solid var(--border);border-radius:12px;padding:10px 12px;}
+.live-group.idle{opacity:0.75;}
+.live-group-head{font-weight:900;font-size:0.9rem;margin-bottom:6px;}
+.live-group-head span{color:var(--muted);font-size:0.78rem;margin-left:6px;}
+.live-group-names{display:flex;gap:6px;flex-wrap:wrap;}
+.live-chip{padding:3px 10px;border-radius:12px;background:#f0f4ff;font-weight:800;font-size:0.82rem;}
+.live-chip small{color:var(--muted);font-weight:700;}
+
 /* TID */
 .live-tid{font-size:0.7rem;color:var(--muted);font-weight:700;margin-top:5px;}
 .live-away{margin-top:6px;padding:3px 8px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:0.75rem;font-weight:900;display:inline-block;}
@@ -244,7 +255,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.20</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.21</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -305,6 +316,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
       <div class="hand-codes" id="handCodes"></div>
       <div id="handList"></div>
     </div>
+    <div class="live-toolbar"><label class="hand-toggle"><input type="checkbox" onchange="toggleLiveGroup(this.checked)"> Grupper etter hva elevene jobber med nå</label></div>
     <div id="liveGrid" class="live-grid">
       <div class="empty-state"><div class="icon">👥</div><p>Ingen aktiv timekode</p></div>
     </div>
@@ -615,12 +627,24 @@ function updateLiveGrid(data){
     return;
   }
   const now=Date.now();
+  if(liveGroupMode){
+    const groups={}, idle=[];
+    names.forEach(n=>{ const c=currentGame(data[n]); if(!c){ idle.push(n); return; } const k=c.g+'|'+(c.d.level??''); (groups[k]=groups[k]||{g:c.g,lv:c.d.level,list:[]}).list.push(n); });
+    const keys=Object.keys(groups).sort((a,b)=>groups[b].list.length-groups[a].list.length||gameTitle(groups[a].g).localeCompare(gameTitle(groups[b].g),'nb'));
+    el.innerHTML=(keys.map(k=>{ const G=groups[k];
+      return `<div class="live-group"><div class="live-group-head">▶ ${gameTitle(G.g)}${G.lv!==undefined&&G.lv!==null?' · '+levelText(G.g,G.lv):''} <span>${G.list.length} elev${G.list.length>1?'er':''}</span></div>
+        <div class="live-group-names">${G.list.sort((a,b)=>a.localeCompare(b,'nb')).map(n=>`<span class="live-chip">${n}${data[n].nickname?' <small>('+data[n].nickname+')</small>':''}</span>`).join('')}</div></div>`; }).join('')
+      +(idle.length?`<div class="live-group idle"><div class="live-group-head">Ikke aktive i et spill nå <span>${idle.length}</span></div><div class="live-group-names">${idle.sort((a,b)=>a.localeCompare(b,'nb')).map(n=>`<span class="live-chip">${n}</span>`).join('')}</div></div>`:''))
+      ||'<div class="empty-state"><p>Ingen elever ennå</p></div>';
+    return;
+  }
   const sorted=[...names].sort((a,b)=>(data[b].lastSeen||0)-(data[a].lastSeen||0));
   el.innerHTML=sorted.map(name=>{
     const p=data[name];
     const games=p.games||{};
-    const gameNames=Object.keys(games);
+    const gameNames=Object.keys(games).sort((a,b)=>((games[b]||{}).lastUpdated||0)-((games[a]||{}).lastUpdated||0));
     const lastSeen=p.lastSeen||p.joined||0;
+    const cur=currentGame(p);
     const agoMin=lastSeen?Math.floor((now-lastSeen)/60000):null;
     const isActive=lastSeen&&(now-lastSeen)<60000;
     const inactive=agoMin!==null&&agoMin>=10;
@@ -629,10 +653,10 @@ function updateLiveGrid(data){
       const tot=(gd.correct||0)+(gd.wrong||0);
       const pct=tot>0?Math.round((gd.correct||0)/tot*100):0;
       const noLevel=gd.level===null||gd.level===undefined;
-      const start=gd.startLevel||gd.level, max=gd.maxLevel||gd.level;
-      const lv=noLevel?'':`<span class="live-stat stat-level">N${start||'?'}${max&&max!==start?'→'+max:''}</span>`;
+      const max=gd.maxLevel||gd.level;
+      const lv=noLevel?'':`<span class="live-stat stat-level" title="Nivå nå${max&&max!==gd.level?' (høyeste nivå i økta)':''}">N${gd.level}${max&&max!==gd.level?' (maks '+max+')':''}</span>`;
       return `<div style="display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:4px">
-        <span style="font-size:0.7rem;font-weight:800;min-width:90px">${g}</span>${lv}
+        <span style="font-size:0.7rem;font-weight:800;min-width:90px">${cur&&cur.g===g?'▶ ':''}${gameTitle(g)}</span>${lv}
         <span class="live-stat stat-correct">✓${gd.correct||0}</span>
         <span class="live-stat stat-wrong">✗${gd.wrong||0}</span>
         ${tot>0?`<span class="live-stat" style="background:#f0f4ff;color:var(--accent)">${pct}%</span>`:''}
@@ -653,12 +677,32 @@ function updateLiveGrid(data){
         <div class="active-dot ${isActive?'active':'inactive'}"></div>
       </div>
       ${awayBadge}
+      ${cur?`<div class="live-now">▶ Nå: <b>${gameTitle(cur.g)}</b>${cur.d.level!==undefined&&cur.d.level!==null?' · '+levelText(cur.g,cur.d.level):''}${cur.d.sett?' · '+cur.d.sett:''}</div>`:''}
       ${gameNames.length?rows:'<div style="font-size:0.75rem;color:var(--muted);margin-top:4px">Ingen spill ennå</div>'}
       ${tidRow}
       ${status}
     </div>`;
   }).join('');
 }
+
+// Vanlige navn på spillene (spillnavn → tittel)
+const GAME_TITLES={'areal-regn':'Regn ut arealet','areal-ruter':'Arealruter','balansevekt':'Balansevekten','ligningsvekt':'Ligningsvekten',
+  'likningsbygger':'Likningsbyggeren','likningssett':'Likningssett','bygge-uttrykk':'Bygg uttrykk','tekst-til-uttrykk':'Tekst til uttrykk',
+  'uttrykk-til-tabell':'Uttrykk til tabell','funksjoner-quiz':'Funksjonsquiz','funksjonsfabrikk':'Funksjonsfabrikken','koordinatslag':'Koordinatslag',
+  'figurtall-lineaere':'Lineære figurtall','figurtall-tabell':'Figurtall med tabell','figurtall-kvadratiske':'Kvadratiske figurtall',
+  'oppgaver-plangeometri':'Oppgavesamling plangeometri','vinkeldetektiven':'Vinkeldetektiven','vinkelsum':'Vinkelsum-laben','mangekanter':'Mangekant-verkstedet',
+  'sirkellaben':'Sirkellaben','figurer':'Hvem er jeg?','memory-duell':'Memory-duell','sant-usant':'Sant eller usant','begrepsbingo':'Begrepsbingo','begrep-kjemi':'Begrepsjakten (kjemi)'};
+const gameTitle=g=>GAME_TITLES[g]||g;
+const NOW_MS=5*60000; // regnes som «holder på med nå» hvis svart de siste 5 minuttene
+function currentGame(p){
+  const games=p.games||{}; let best=null;
+  Object.entries(games).forEach(([g,d])=>{ if(d&&d.lastUpdated&&(!best||d.lastUpdated>best.d.lastUpdated)) best={g,d}; });
+  if(!best||Date.now()-best.d.lastUpdated>NOW_MS) return null;
+  return best;
+}
+function levelText(g,lv){ if(lv===null||lv===undefined) return ''; const desc=GAME_LEVELS[g]?getLevelDesc(g,lv):''; return 'nivå '+lv+(desc?' – '+desc:''); }
+let liveGroupMode=false;
+window.toggleLiveGroup=function(on){ liveGroupMode=on; mergeAndUpdateLiveGrid(); };
 
 // Borte-merket vises bare mens økta pågår (ikke for elever som gikk for en time siden)
 function tcIsLive(p){ const t=p.tid||{}; return Date.now()-Math.max(t.borteNa||0,t.oppdatert||0,p.lastSeen||0)<45*60000; }

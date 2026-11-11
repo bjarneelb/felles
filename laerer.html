@@ -167,6 +167,28 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .live-tid{font-size:0.7rem;color:var(--muted);font-weight:700;margin-top:5px;}
 .live-away{margin-top:6px;padding:3px 8px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:0.75rem;font-weight:900;display:inline-block;}
 
+/* HÅND OPPE */
+.hand-card{border-color:#f59e0b;background:#fffbeb;}
+.hand-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+.hand-toggle{display:flex;align-items:center;gap:6px;font-size:0.82rem;font-weight:800;cursor:pointer;}
+.hand-codes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.hand-codes:empty{display:none;}
+.hand-code{padding:3px 10px;border-radius:14px;border:2px solid var(--border);background:white;font-weight:900;font-size:0.75rem;letter-spacing:1px;cursor:pointer;font-family:'Nunito',sans-serif;}
+.hand-code.on{border-color:#f59e0b;background:#fef3c7;}
+.hand-empty{font-size:0.85rem;color:var(--muted);font-weight:700;padding:4px 0;}
+.hand-row{display:flex;align-items:flex-start;gap:10px;background:white;border:2px solid #fde68a;border-radius:12px;padding:9px 12px;margin-bottom:6px;}
+.hand-nr{font-weight:900;color:#b45309;min-width:1.6em;font-size:1.05rem;}
+.hand-main{flex:1;min-width:0;}
+.hand-name{font-weight:900;}
+.hand-name small{color:var(--muted);font-weight:700;}
+.hand-what{font-size:0.78rem;color:var(--muted);font-weight:700;margin-top:2px;}
+.hand-valg{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:8px;background:#fef3c7;color:#92400e;font-size:0.75rem;font-weight:900;}
+.hand-tekst{font-size:0.82rem;font-weight:700;margin-top:3px;font-style:italic;}
+.hand-wait{font-size:0.75rem;font-weight:900;color:var(--muted);white-space:nowrap;}
+.hand-wait.long{color:var(--red);}
+.hand-group{margin-bottom:10px;}
+.hand-ghead{display:flex;align-items:center;gap:10px;justify-content:space-between;font-weight:900;font-size:0.85rem;margin:6px 0;flex-wrap:wrap;}
+
 /* MISC */
 .empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
 .empty-state .icon{font-size:3rem;margin-bottom:12px;}
@@ -222,7 +244,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.17</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.18</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -232,7 +254,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 <!-- TABS -->
 <div class="tabs">
   <button class="tab active" onclick="showTab('timekode')">⏱️ Timekode</button>
-  <button class="tab" onclick="showTab('live')">👥 Live-oversikt</button>
+  <button class="tab" onclick="showTab('live')" id="liveTabBtn">👥 Live-oversikt</button>
   <button class="tab" onclick="showTab('rom')">🏁 Spillrom</button>
   <button class="tab" onclick="showTab('rapport')">📊 Rapport</button>
   <button class="tab" onclick="showTab('begrep')">📚 Begrepssett</button>
@@ -274,6 +296,14 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
     <div>
       <div class="panel-title">👥 Live-oversikt</div>
       <div class="panel-sub">Elever tilkoblet via aktiv timekode — oppdateres automatisk</div>
+    </div>
+    <div class="card hand-card" id="handCard" style="display:none">
+      <div class="hand-head">
+        <div class="card-label" style="margin:0">✋ Rekker opp hånda <span id="handCount"></span></div>
+        <label class="hand-toggle"><input type="checkbox" id="handGroup" onchange="renderHands()"> Grupper etter spill og nivå</label>
+      </div>
+      <div class="hand-codes" id="handCodes"></div>
+      <div id="handList"></div>
     </div>
     <div id="liveGrid" class="live-grid">
       <div class="empty-state"><div class="icon">👥</div><p>Ingen aktiv timekode</p></div>
@@ -499,6 +529,7 @@ window.createTimecode=async function(){
   const expires=Date.now()+minutes*60*1000;
   activeCode=code;
   document.getElementById('rapportCode').value=code;
+  rememberMine(code);
   await window._set(window._ref(window._db,'timecodes/'+code),{
     created:Date.now(),expires,minutes,active:true
   });
@@ -511,6 +542,7 @@ window.stopTimecode=async function(code){
   delete tcPlayersCache[code];
   if(tcIntervals[code]){clearInterval(tcIntervals[code]);delete tcIntervals[code];}
   if(tcLiveUnsubs[code]){tcLiveUnsubs[code]();delete tcLiveUnsubs[code];}
+  stopHands(code);
   if(!Object.keys(activeCodes).length){
     document.getElementById('tcActiveCard').style.display='none';
     document.getElementById('liveGrid').innerHTML='<div class="empty-state"><div class="icon">👥</div><p>Ingen aktiv timekode</p></div>';
@@ -535,6 +567,7 @@ function addActiveTimecode(code,expires,minutes){
     el.className='tc-timer'+(left<5*60000?' expiring':'');
   },1000);
 
+  listenHands(code);
   if(tcLiveUnsubs[code]) tcLiveUnsubs[code]();
   tcLiveUnsubs[code]=window._onValue(window._ref(window._db,'timecodes/'+code+'/players'),snap=>{
     tcPlayersCache[code]=snap.val()||{};
@@ -1461,6 +1494,71 @@ window.bsImportKjemi=async function(){
   try{ await window._set(window._ref(window._db,'begrepssett/kjemi-naturfag'),{...BS_KJEMI,endret:Date.now()}); showToast('Kjemisettet er lagt inn','success'); }
   catch(e){ showToast('Kunne ikke lagre: '+e.message,'error'); }
 };
+
+// ── REKK OPP HÅNDA ──
+// timecodes/KODE/hender/NAVN = {ts, nick, spill, tittel, nivaa, sett, valg, tekst}
+let handsCache={}, handUnsubs={}, handFollow=null;
+const MINE_KEY='laerer_mine_koder';
+function mineKoder(){ try{ return JSON.parse(localStorage.getItem(MINE_KEY)||'[]'); }catch(e){ return []; } }
+function rememberMine(code){ try{ const m=mineKoder().filter(c=>c!==code); m.unshift(code); localStorage.setItem(MINE_KEY,JSON.stringify(m.slice(0,30))); }catch(e){} }
+function listenHands(code){
+  if(handUnsubs[code]) return;
+  handUnsubs[code]=window._onValue(window._ref(window._db,'timecodes/'+code+'/hender'),snap=>{ handsCache[code]=snap.val()||{}; renderHands(); });
+}
+function stopHands(code){ if(handUnsubs[code]){ handUnsubs[code](); delete handUnsubs[code]; } delete handsCache[code]; renderHands(); }
+// Hvilke timekoder køen følger: dine egne (laget på denne maskinen), ellers alle aktive
+function followed(){
+  const active=Object.keys(activeCodes);
+  if(!handFollow){ const mine=mineKoder().filter(c=>active.includes(c)); handFollow=new Set(mine.length?mine:active); }
+  active.forEach(c=>{ if(!handFollow.has(c)&&mineKoder().includes(c)) handFollow.add(c); });
+  return active.filter(c=>handFollow.has(c));
+}
+window.toggleHandCode=function(c){ followed(); handFollow.has(c)?handFollow.delete(c):handFollow.add(c); renderHands(); };
+function handLevelText(h){
+  if(h.nivaa===undefined||h.nivaa===null) return '';
+  const g=GAME_LEVELS[h.spill];
+  return 'Nivå '+h.nivaa+(g?' – '+getLevelDesc(h.spill,h.nivaa):'');
+}
+window.renderHands=function(){
+  const card=document.getElementById('handCard');
+  const active=Object.keys(activeCodes);
+  if(!active.length){ card.style.display='none'; document.getElementById('liveTabBtn').textContent='👥 Live-oversikt'; return; }
+  card.style.display='';
+  const fol=followed();
+  document.getElementById('handCodes').innerHTML=active.length>1?active.map(c=>'<button class="hand-code'+(fol.includes(c)?' on':'')+'" onclick="toggleHandCode(\''+c+'\')">'+c+'</button>').join(''):'';
+  const now=Date.now();
+  const hands=[];
+  fol.forEach(c=>Object.entries(handsCache[c]||{}).forEach(([name,h])=>{ if(h&&h.ts) hands.push({...h,name,code:c}); }));
+  hands.sort((a,b)=>a.ts-b.ts);
+  document.getElementById('handCount').textContent=hands.length?'('+hands.length+')':'';
+  document.getElementById('liveTabBtn').textContent='👥 Live-oversikt'+(hands.length?' ✋'+hands.length:'');
+  const list=document.getElementById('handList');
+  if(!hands.length){ list.innerHTML='<div class="hand-empty">Ingen har rukket opp hånda.</div>'; return; }
+  const multi=fol.length>1;
+  const row=(h,i)=>{ const w=Math.floor((now-h.ts)/60000);
+    const what=[h.tittel||h.spill||'Ukjent spill',handLevelText(h),h.sett?'Sett: '+h.sett:''].filter(Boolean).map(escapeHtml).join(' · ');
+    return '<div class="hand-row"><div class="hand-nr">'+(i+1)+'</div><div class="hand-main">'+
+      '<div class="hand-name">'+escapeHtml(h.name)+(h.nick?' <small>('+escapeHtml(h.nick)+')</small>':'')+(multi?' <small>· '+h.code+'</small>':'')+'</div>'+
+      '<div class="hand-what">'+what+'</div>'+
+      (h.valg?'<span class="hand-valg">'+escapeHtml(h.valg)+'</span>':'')+
+      (h.tekst?'<div class="hand-tekst">«'+escapeHtml(h.tekst)+'»</div>':'')+
+      '</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="hand-wait'+(w>=5?' long':'')+'">'+(w<1?'nå':w+' min')+'</span>'+
+      '<button class="btn btn-primary btn-sm" onclick="handDone(\''+h.code+'\',\''+encodeURIComponent(h.name).replace(/'/g,'%27')+'\')">✓ Hjulpet</button></div></div>'; };
+  if(!document.getElementById('handGroup').checked){ list.innerHTML=hands.map(row).join(''); return; }
+  const groups={};
+  hands.forEach(h=>{ const k=(h.spill||h.tittel||'Ukjent')+'|'+(h.nivaa??''); (groups[k]=groups[k]||[]).push(h); });
+  list.innerHTML=Object.values(groups).sort((a,b)=>a[0].ts-b[0].ts).map(g=>{
+    const h=g[0], lab=[h.tittel||h.spill||'Ukjent spill',handLevelText(h)].filter(Boolean).map(escapeHtml).join(' · ');
+    const ids=g.map(x=>x.code+'|'+encodeURIComponent(x.name).replace(/'/g,'%27')).join(',');
+    return '<div class="hand-group"><div class="hand-ghead"><span>'+lab+' — '+g.length+' elev'+(g.length>1?'er':'')+'</span>'+
+      (g.length>1?'<button class="btn btn-ghost btn-sm" onclick="handDoneMany(\''+ids+'\')">✓ Hjulpet alle '+g.length+'</button>':'')+'</div>'+
+      g.map(row).join('')+'</div>';
+  }).join('');
+};
+function escapeHtml(t){ return String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+window.handDone=function(code,enc){ window._remove(window._ref(window._db,'timecodes/'+code+'/hender/'+decodeURIComponent(enc))); };
+window.handDoneMany=function(ids){ ids.split(',').forEach(x=>{ const [c,e]=x.split('|'); handDone(c,e); }); };
+setInterval(()=>{ if(Object.keys(activeCodes).length) renderHands(); },20000);
 
 // ── TOAST ──
 function showToast(msg,type){

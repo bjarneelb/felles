@@ -1,4 +1,4 @@
-// ── spill-utils.js v2.4 ──
+// ── spill-utils.js v2.5 ──
 // Felles hjelpefunksjoner for alle fagsider og spill.
 //
 // VIKTIG: Lastes i <head>, FØR spillets egen kode:
@@ -62,6 +62,8 @@ function whenFb(cb){
 // Bruk: syncToTimecode('spillnavn', {level, startLevel, maxLevel, score, correct, wrong, sessionStart})
 // Lagres under timecodes/KODE/players/EKTE_NAVN/games/spillnavn
 function syncToTimecode(spillnavn,data){
+  // Husk hva eleven holder på med, så «rekk opp hånda» kan sende det med
+  window.__suSist={spillnavn,level:data&&data.level,sett:data&&data.sett};
   const s=getActiveSession();
   if(!s||!s.name||!spillnavn) return;
   whenFb(()=>{
@@ -336,6 +338,92 @@ function addTidNotice(){
 }
 function suTidInit(){ try{ startTidMaling(); addTidNotice(); }catch(e){} }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',suTidInit); else suTidInit();
+
+// ── REKK OPP HÅNDA ──
+// Lagres under timecodes/KODE/hender/NAVN = {ts, nick, spill, tittel, nivaa, sett, valg, tekst}
+// Læreren ser køen på lærersiden og tar hånda ned med «Hjulpet».
+const SU_HAND_VALG=['Forstår ikke oppgaven','Får feil hele tiden','Vet ikke hva jeg skal gjøre','Noe virker ikke'];
+function startHand(){
+  const s=getActiveSession();
+  const p=location.pathname;
+  if(!s||!s.name||p.endsWith('/')||/\/index\.html?$/i.test(p)) return;
+  if(document.getElementById('suHand')) return;
+  const st=document.createElement('style');
+  st.textContent=
+    '#suHand{position:fixed;right:12px;bottom:12px;z-index:400;font-family:Nunito,system-ui,sans-serif;}'+
+    '#suHandBtn{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:24px;border:2px solid #e2e8f0;background:#fff;color:#1e293b;font-weight:900;font-size:.88rem;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18);font-family:inherit;}'+
+    '#suHandBtn:hover{border-color:#f59e0b;}'+
+    '#suHandBtn.up{background:#fef3c7;border-color:#f59e0b;color:#92400e;animation:suWave 2.4s ease-in-out infinite;}'+
+    '@keyframes suWave{0%,100%{transform:none}50%{transform:translateY(-2px)}}'+
+    '#suHandPanel{position:absolute;right:0;bottom:52px;width:min(320px,calc(100vw - 24px));background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:14px;display:flex;flex-direction:column;gap:8px;color:#1e293b;}'+
+    '#suHandPanel h4{font-size:1rem;font-weight:900;margin:0;}'+
+    '#suHandPanel .ch{padding:9px 12px;border-radius:10px;border:2px solid #e2e8f0;background:#fff;font-weight:800;font-size:.86rem;text-align:left;cursor:pointer;font-family:inherit;color:#1e293b;}'+
+    '#suHandPanel .ch.on{border-color:#f59e0b;background:#fffbeb;}'+
+    '#suHandPanel textarea{border:2px solid #e2e8f0;border-radius:10px;padding:8px 10px;font-family:inherit;font-weight:700;font-size:.86rem;resize:none;height:56px;}'+
+    '#suHandPanel .row{display:flex;gap:8px;}'+
+    '#suHandPanel .go{flex:1;padding:10px;border-radius:10px;border:none;background:#f59e0b;color:#fff;font-weight:900;cursor:pointer;font-family:inherit;}'+
+    '#suHandPanel .no{padding:10px 14px;border-radius:10px;border:none;background:#f1f5f9;color:#475569;font-weight:800;cursor:pointer;font-family:inherit;}'+
+    '#suHandPanel .info{font-size:.75rem;color:#64748b;font-weight:700;}'+
+    '@media (max-width:520px){#suHandBtn .t{display:none;}#suHandBtn{padding:10px 12px;}#suHandBtn.up .t{display:inline;}}';
+  document.head.appendChild(st);
+  const box=document.createElement('div'); box.id='suHand';
+  box.innerHTML='<div id="suHandPanel" style="display:none"></div><button id="suHandBtn" type="button">✋ <span class="t">Rekk opp hånda</span></button>';
+  document.body.appendChild(box);
+  const btn=box.querySelector('#suHandBtn'), panel=box.querySelector('#suHandPanel');
+  const base='timecodes/'+s.code+'/hender';
+  let mine=null, iLowered=false, valg='';
+  btn.onclick=()=>{ if(mine) openLower(); else openRaise(); };
+  function close(){ panel.style.display='none'; }
+  function openRaise(){
+    valg='';
+    const sist=window.__suSist||{};
+    panel.innerHTML='<h4>✋ Hva trenger du hjelp med?</h4>'+
+      SU_HAND_VALG.map(v=>'<button class="ch" type="button">'+suEsc(v)+'</button>').join('')+
+      '<textarea maxlength="140" placeholder="Skriv mer hvis du vil (valgfritt)"></textarea>'+
+      '<div class="info">Læreren ser også hvilket spill'+(sist.level!=null?' og nivå':'')+' du er på.</div>'+
+      '<div class="row"><button class="no" type="button">Avbryt</button><button class="go" type="button">✋ Rekk opp</button></div>';
+    panel.querySelectorAll('.ch').forEach(b=>b.onclick=()=>{ valg=valg===b.textContent?'':b.textContent;
+      panel.querySelectorAll('.ch').forEach(x=>x.classList.toggle('on',x.textContent===valg)); });
+    panel.querySelector('.no').onclick=close;
+    panel.querySelector('.go').onclick=()=>{
+      const sist=window.__suSist||{};
+      const d={ts:Date.now(),nick:window.playerName||'',tittel:(document.title||'').slice(0,60),spill:sist.spillnavn||'',
+        valg,tekst:panel.querySelector('textarea').value.trim().slice(0,140)};
+      if(sist.level!==undefined&&sist.level!==null) d.nivaa=sist.level;
+      if(sist.sett) d.sett=String(sist.sett).slice(0,40);
+      whenFb(()=>window._set(window._ref(window._db,base+'/'+s.name),d));
+      close();
+    };
+    panel.style.display='flex';
+  }
+  function openLower(){
+    panel.innerHTML='<h4>✋ Hånda di er oppe</h4><div class="info">Læreren kommer så snart hen kan. Du kan spille videre mens du venter.</div>'+
+      '<div class="row"><button class="no" type="button">Lukk</button><button class="go" type="button" style="background:#64748b">Ta ned hånda</button></div>';
+    panel.querySelector('.no').onclick=close;
+    panel.querySelector('.go').onclick=()=>{ iLowered=true; whenFb(()=>window._remove(window._ref(window._db,base+'/'+s.name))); close(); };
+    panel.style.display='flex';
+  }
+  whenFb(()=>window._onValue(window._ref(window._db,base),snap=>{
+    const all=snap.val()||{};
+    const had=!!mine;
+    mine=all[s.name]||null;
+    if(mine){
+      const nr=Object.values(all).filter(h=>h&&h.ts<=mine.ts).length;
+      btn.classList.add('up'); btn.innerHTML='✋ <span class="t">Hånda er oppe – du er nr. '+nr+'</span>';
+    } else {
+      btn.classList.remove('up'); btn.innerHTML='✋ <span class="t">Rekk opp hånda</span>';
+      if(had&&!iLowered){
+        if(document.getElementById('toast')) showToast('✓ Læreren har sett hånda di','success');
+        else { const t=document.createElement('div'); t.textContent='✓ Læreren har sett hånda di';
+          t.style.cssText='position:absolute;right:0;bottom:52px;white-space:nowrap;background:#16a34a;color:#fff;font-weight:900;padding:9px 14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.2);';
+          box.appendChild(t); setTimeout(()=>t.remove(),3500); }
+      }
+      iLowered=false;
+    }
+  }));
+}
+function suHandInit(){ try{ startHand(); }catch(e){} }
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',suHandInit); else suHandInit();
 
 // Originalene, så spill som lager egne versjoner fortsatt kan bruke dem
 window.SU={generateNickname,readSession,getActiveSession,getNickname,whenFb,syncToTimecode,syncToTimecodeGeneric,

@@ -1132,6 +1132,16 @@ function startDemo() {
 }
 
 // ── LAUNCH RACE ──
+// Merk rommet som ekte, så elevene får lov til å bli med (spill-utils sjekker rooms/KODE/meta)
+function markRoom(room,type){
+  if(!room) return;
+  const go=()=>window._update(window._ref(window._db,'rooms/'+room+'/meta'),{created:Date.now(),type});
+  if(window._fbReady) go(); else setTimeout(()=>markRoom(room,type),300);
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const ri=document.getElementById('roomInput');
+  if(ri) ri.addEventListener('change',()=>{ const r=ri.value.trim().toUpperCase(); if(r.length>=2) markRoom(r,'bilbane'); });
+});
 window.launchRace = function() {
   const room = document.getElementById('roomInput').value.trim().toUpperCase();
   lapGoal = parseInt(document.getElementById('lapGoal').value) || 5;
@@ -1141,6 +1151,7 @@ window.launchRace = function() {
   document.getElementById('setupOverlay').style.display = 'none';
 
   roomCode = room;
+  markRoom(room,'bilbane');
   window.roomCode = room;
   raceStarted = false;
 

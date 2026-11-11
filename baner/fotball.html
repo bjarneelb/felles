@@ -333,7 +333,7 @@ window.createRoom=function(){
   totalMatchTime=matchDuration; matchTimeLeft=matchDuration;
   roomCode=room;
   // Opprett rommet i Firebase
-  window._set(window._ref(window._db,'rooms/'+room+'/meta'),{
+  window._update(window._ref(window._db,'rooms/'+room+'/meta'),{
     created:Date.now(), type:'fotball'
   });
   document.getElementById('roomDisplay2').textContent=room;
@@ -1289,6 +1289,13 @@ function startMatchFirebaseSync(room){
 window.addEventListener('load',()=>{
   initCanvas();
   drawPitch();
+});
+</script>
+<script>
+// Merk rommet så snart koden er skrevet inn, så elevene kan bli med mens du gjør klar
+document.addEventListener('DOMContentLoaded',()=>{
+  const ri=document.getElementById('roomInput');
+  if(ri) ri.addEventListener('change',()=>{ const r=ri.value.trim().toUpperCase(); if(r.length>=2&&window._fbReady) window._update(window._ref(window._db,'rooms/'+r+'/meta'),{created:Date.now(),type:'fotball'}); });
 });
 </script>
 </body>

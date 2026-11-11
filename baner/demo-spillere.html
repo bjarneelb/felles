@@ -113,7 +113,8 @@ function startDemo(){
     name, score:0, color:COLORS[i%COLORS.length]
   }));
 
-  // Registrer dem i Firebase
+  // Registrer dem i Firebase (og merk rommet som ekte)
+  window._update(window._ref(window._db,'rooms/'+room+'/meta'),{created:Date.now(),type:'demo'});
   demoPlayers.forEach(p=>{
     window._update(window._ref(window._db,'rooms/'+room+'/players/'+p.name),{
       score:0, lastUpdated:Date.now()

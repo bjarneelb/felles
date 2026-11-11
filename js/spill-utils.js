@@ -1,4 +1,4 @@
-// ── spill-utils.js v2.5 ──
+// ── spill-utils.js v2.6 ──
 // Felles hjelpefunksjoner for alle fagsider og spill.
 //
 // VIKTIG: Lastes i <head>, FØR spillets egen kode:
@@ -92,13 +92,14 @@ function levelTracker(){
 function initRoom(code,onPlayers){
   const rb=document.getElementById('roomBadge');
   const rc=document.getElementById('roomBadgeCode');
-  if(rb) rb.style.display='';
-  if(rc) rc.textContent=code;
   if(!code) return;
-  window._roomCode=code;
-  whenFb(()=>{
+  code=String(code).trim().toUpperCase();
+  function joinRoom(code){
+    window._roomCode=code;
+    if(rb) rb.style.display='';
+    if(rc) rc.textContent=code;
     const name=window.playerName;
-    window._update(window._ref(window._db,'rooms/'+code+'/players/'+name),{score:0,lastUpdated:Date.now()});
+    window._update(window._ref(window._db,'rooms/'+code+'/players/'+name),{score:window.currentScore||0,lastUpdated:Date.now()});
     if(onPlayers){
       window._onValue(window._ref(window._db,'rooms/'+code+'/players'),snap=>{ if(snap.val()) onPlayers(snap.val()); });
     }
@@ -108,7 +109,42 @@ function initRoom(code,onPlayers){
       if(window._get) window._get(window._ref(window._db,'rooms/'+code)).then(s=>vis(s.val())).catch(()=>vis(null));
       else vis(null);
     });
+  }
+  // Bli med først når rommet finnes (banen er åpnet på storskjermen). Til da sendes ingen poeng.
+  whenFb(()=>{
+    window._get(window._ref(window._db,'rooms/'+code+'/meta')).then(snap=>{
+      if(snap.val()) joinRoom(code); else roomNotFound(code,joinRoom);
+    }).catch(()=>joinRoom(code)); // ingen kontakt: ikke stopp eleven
   });
+}
+// Romkoden finnes ikke: la eleven skrive den på nytt, eller spille videre uten bane
+function roomNotFound(code,joinRoom){
+  if(document.getElementById('suRoomMissing')) return;
+  const o=document.createElement('div');
+  o.id='suRoomMissing';
+  o.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Nunito,system-ui,sans-serif;';
+  o.innerHTML='<div style="background:#fff;border-radius:16px;padding:22px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)">'+
+    '<div style="font-size:2.2rem">🏁</div><h3 style="font-size:1.15rem;font-weight:900;margin:4px 0 6px;color:#1e293b">Fant ikke rommet «'+suEsc(code)+'»</h3>'+
+    '<p style="font-size:.9rem;font-weight:700;color:#64748b;line-height:1.5;margin-bottom:12px">Sjekk romkoden på storskjermen. Banen må være åpnet før du kan bli med.</p>'+
+    '<input id="suRoomRetry" maxlength="8" value="'+suEsc(code)+'" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:10px;font-family:inherit;font-size:1.1rem;font-weight:900;text-align:center;text-transform:uppercase;letter-spacing:3px;margin-bottom:10px" autocomplete="off">'+
+    '<div id="suRoomMsg" style="min-height:1.2em;color:#dc2626;font-weight:800;font-size:.85rem;margin-bottom:8px"></div>'+
+    '<button id="suRoomTry" style="width:100%;padding:11px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-family:inherit;font-weight:900;font-size:1rem;cursor:pointer;margin-bottom:8px">Prøv igjen</button>'+
+    '<button id="suRoomSkip" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;font-family:inherit;font-weight:800;cursor:pointer">Spill uten bane</button></div>';
+  document.body.appendChild(o);
+  const inp=o.querySelector('#suRoomRetry'), msg=o.querySelector('#suRoomMsg');
+  inp.focus(); inp.select();
+  const tryIt=()=>{
+    const c=inp.value.trim().toUpperCase();
+    if(!c){ msg.textContent='Skriv inn romkoden.'; return; }
+    msg.style.color='#64748b'; msg.textContent='Sjekker …';
+    window._get(window._ref(window._db,'rooms/'+c+'/meta')).then(snap=>{
+      if(!snap.val()){ msg.style.color='#dc2626'; msg.textContent='Fant ikke «'+c+'» heller. Er banen åpnet?'; return; }
+      o.remove(); joinRoom(c);
+    }).catch(()=>{ msg.style.color='#dc2626'; msg.textContent='Fikk ikke kontakt. Prøv igjen.'; });
+  };
+  o.querySelector('#suRoomTry').onclick=tryIt;
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter') tryIt(); });
+  o.querySelector('#suRoomSkip').onclick=()=>{ o.remove(); window.gameMode='practice'; };
 }
 function syncRoomScore(score){
   const code=window._roomCode;

@@ -255,7 +255,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.21</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.22</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -1081,14 +1081,22 @@ const rapportElId=name=>'rapport-'+name.replace(/[^A-Za-z0-9ÆØÅæøå_-]/g,'_
 
 // Tid i spillet (fra spill-utils): {aktivMs, inaktivMs, borteMs, borteAntall, borteNa, oppdatert}
 const tidMin=ms=>Math.round((ms||0)/60000);
-function tidInfo(p){
+// Pågående «borte» (borteNa) telles bare mens økta faktisk pågår: høyst 45 min tilbake i tid, og aldri etter at
+// timekoden utløp. Lukket eleven fanen og gikk, skal ikke tiden etterpå telle som borte.
+const BORTE_NA_MAKS=45*60000;
+const rapportExp=()=>{ const tc=rapportCodesData[rapportCodeLoaded]; return tc&&tc.expires||null; };
+function tidInfo(p,expires){
   const t=(p&&p.tid)||null; if(!t) return null;
-  let borteMs=t.borteMs||0;
-  if(t.borteNa) borteMs+=Math.max(0,Date.now()-t.borteNa);
-  return {aktiv:tidMin(t.aktivMs),inaktiv:tidMin(t.inaktivMs),borte:tidMin(borteMs),antall:(t.borteAntall||0)+(t.borteNa&&Date.now()-t.borteNa>=5000?1:0),borteNa:t.borteNa||null};
+  let borteMs=t.borteMs||0, antall=t.borteAntall||0;
+  if(t.borteNa){
+    const slutt=Math.min(Date.now(),expires||Infinity);
+    const varighet=slutt-t.borteNa;
+    if(Date.now()-t.borteNa<=BORTE_NA_MAKS&&varighet>=5000){ borteMs+=varighet; antall++; }
+  }
+  return {aktiv:tidMin(t.aktivMs),inaktiv:tidMin(t.inaktivMs),borte:tidMin(borteMs),antall,borteNa:t.borteNa||null};
 }
-function tidTekst(p){
-  const t=tidInfo(p); if(!t) return 'Ingen tidsdata (eldre versjon av spillet eller ikke logget inn).';
+function tidTekst(p,expires){
+  const t=tidInfo(p,expires); if(!t) return 'Ingen tidsdata (eldre versjon av spillet eller ikke logget inn).';
   return 'Aktiv '+t.aktiv+' min, inaktiv '+t.inaktiv+' min, borte fra spillet '+t.antall+' gang'+(t.antall===1?'':'er')+' (til sammen '+t.borte+' min).';
 }
 
@@ -1112,7 +1120,7 @@ window.downloadRapportCsv=function(){
   if(!names.length){ showToast('Ingen elever å laste ned','error'); return; }
   const q=v=>{ v=String(v??''); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const rows=[['Timekode','Elev','Kallenavn','Aktiv min','Inaktiv min','Borte antall','Borte min','Spill','Poeng','Riktige','Feil','Treff %','Nivå start','Nivå høyest','Nivå sist','Sett','Startet','Sist aktiv']];
-  names.forEach(n=>{ const p=rapportStudentData[n]||{}; const g=rapportGameRows(n); const t=tidInfo(p);
+  names.forEach(n=>{ const p=rapportStudentData[n]||{}; const g=rapportGameRows(n); const t=tidInfo(p,rapportExp());
     const tc=t?[t.aktiv,t.inaktiv,t.antall,t.borte]:['','','',''];
     if(!g.length) rows.push([rapportCodeLoaded,n,p.nickname||'',...tc,'(ingen spill)','','','','','','','','','','']);
     g.forEach(r=>rows.push([rapportCodeLoaded,n,p.nickname||'',...tc,r.spill,r.poeng,r.riktige,r.feil,r.pct,r.start,r.maks,r.sist,r.sett,rapportTime(r.startet),rapportTime(r.sistAktiv)]));
@@ -1128,7 +1136,7 @@ window.downloadRapportTxt=function(){
     L.push(n+(p.nickname?' ('+p.nickname+')':''));
     L.push('');
     const g=rapportGameRows(n);
-    L.push('Tid: '+tidTekst(p));
+    L.push('Tid: '+tidTekst(p,rapportExp()));
     if(!g.length) L.push('Ingen spill registrert.');
     g.forEach(r=>{
       let t='• '+r.spill+': '+r.riktige+' riktige, '+r.feil+' feil'+(r.pct!==''?' ('+r.pct+' %)':'')+', '+r.poeng+' poeng';
@@ -1195,7 +1203,7 @@ window.loadRapportStudents=async function(){
       <div style="flex:1">
         <div style="font-weight:800;font-size:0.9rem">${name}${p.nickname?` <span style="font-size:0.72rem;color:var(--muted)">(${p.nickname})</span>`:''}</div>
         <div style="font-size:0.75rem;color:var(--muted)">${summary}</div>
-        <div style="font-size:0.72rem;color:var(--muted)">${totalCorrect} riktige · ${totalWrong} feil${(()=>{const t=tidInfo(p);return t?` · ⏱️ ${t.aktiv} min aktiv · 🙈 borte ${t.antall}× (${t.borte} min)`:''})()}</div>
+        <div style="font-size:0.72rem;color:var(--muted)">${totalCorrect} riktige · ${totalWrong} feil${(()=>{const t=tidInfo(p,rapportExp());return t?` · ⏱️ ${t.aktiv} min aktiv · 🙈 borte ${t.antall}× (${t.borte} min)`:''})()}</div>
       </div>`;
     list.appendChild(div);
   });
@@ -1234,7 +1242,7 @@ window.generateRapport=async function(){
     div.className='rapport-elev';
     div.innerHTML=`
       <div class="rapport-elev-name">👤 ${name}</div>
-      <div class="rapport-elev-stats">${stats}<br>⏱️ ${tidTekst(p)}</div>
+      <div class="rapport-elev-stats">${stats}<br>⏱️ ${tidTekst(p,rapportExp())}</div>
       <div class="rapport-loading" id="${rapportElId(name)}">Genererer vurdering...</div>`;
     output.appendChild(div);
     generateAIRapport(name,p).finally(()=>{ rapportPending=Math.max(0,rapportPending-1); updateRapportDl(); });
@@ -1286,7 +1294,7 @@ Eleven jobbet med følgende i denne timen:
 ${gameSummary||'Ingen data tilgjengelig'}
 
 Totalt: ${totalCorrect} riktige av ${totalTasks} oppgaver (${totalPct}%)${activityNote}
-Tidsbruk: ${tidTekst(p)} (Borte betyr at spillvinduet ikke var i fokus, for eksempel fordi eleven byttet vindu eller fane. Nevn dette nøkternt hvis det er påfallende, uten å trekke bastante konklusjoner.)
+Tidsbruk: ${tidTekst(p,rapportExp())} (Borte betyr at spillvinduet ikke var i fokus, for eksempel fordi eleven byttet vindu eller fane. Nevn dette nøkternt hvis det er påfallende, uten å trekke bastante konklusjoner.)
 
 Her er et eksempel på ønsket format (om en annen elev):
 ---

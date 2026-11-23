@@ -164,7 +164,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 .rc-live{color:#16a34a;}
 
 /* LIVE: NÅ OG GRUPPER */
-.live-toolbar{display:flex;justify-content:flex-end;}
+.live-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;}
 .live-now{margin-top:6px;padding:4px 8px;border-radius:8px;background:#eef2ff;color:#3730a3;font-size:0.75rem;font-weight:800;line-height:1.4;}
 .live-group{grid-column:1/-1;background:white;border:2px solid var(--border);border-radius:12px;padding:10px 12px;}
 .live-group.idle{opacity:0.75;}
@@ -255,7 +255,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
 </div>
 
 <div class="header">
-  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.22</span></div>
+  <div class="header-title">🏫 Lærerside <span style="font-size:0.65rem;opacity:0.6;font-family:monospace;font-weight:400">v2.23</span></div>
   <div class="header-right">
     <a class="btn-menu" href="./">← Meny</a>
     <button class="btn-logout" onclick="doLogout()">Logg ut</button>
@@ -316,7 +316,7 @@ body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-
       <div class="hand-codes" id="handCodes"></div>
       <div id="handList"></div>
     </div>
-    <div class="live-toolbar"><label class="hand-toggle"><input type="checkbox" onchange="toggleLiveGroup(this.checked)"> Grupper etter hva elevene jobber med nå</label></div>
+    <div class="live-toolbar"><div class="hand-codes" id="liveCodes" style="margin:0;flex:1"></div><label class="hand-toggle"><input type="checkbox" onchange="toggleLiveGroup(this.checked)"> Grupper etter hva elevene jobber med nå</label></div>
     <div id="liveGrid" class="live-grid">
       <div class="empty-state"><div class="icon">👥</div><p>Ingen aktiv timekode</p></div>
     </div>
@@ -709,7 +709,9 @@ function tcIsLive(p){ const t=p.tid||{}; return Date.now()-Math.max(t.borteNa||0
 setInterval(()=>{ const el=document.getElementById('tab-live'); if(el&&el.classList.contains('active')) mergeAndUpdateLiveGrid(); },15000);
 function mergeAndUpdateLiveGrid(){
   const merged={};
-  Object.values(tcPlayersCache).forEach(players=>{
+  renderLiveCodes();
+  const fol=followed();
+  Object.entries(tcPlayersCache).filter(([code])=>fol.includes(code)).map(([,pl])=>pl).forEach(players=>{
     Object.entries(players).forEach(([name,data])=>{
       if(!merged[name]) merged[name]={...data};
       else{
@@ -722,7 +724,19 @@ function mergeAndUpdateLiveGrid(){
     document.getElementById('liveGrid').innerHTML='<div class="empty-state"><div class="icon">👥</div><p>Ingen aktiv timekode</p></div>';
     return;
   }
+  if(!fol.length){
+    document.getElementById('liveGrid').innerHTML='<div class="empty-state"><div class="icon">👆</div><p>Velg en eller flere timekoder over</p></div>';
+    return;
+  }
   updateLiveGrid(merged);
+}
+// Knapper for å velge hvilke timekoder Live-oversikten og hånd-køen viser
+function renderLiveCodes(){
+  const el=document.getElementById('liveCodes'); if(!el) return;
+  const active=Object.keys(activeCodes), fol=followed();
+  el.innerHTML=active.length?'<span style="font-size:0.75rem;font-weight:800;color:var(--muted);align-self:center">Vis timekode:</span>'+
+    active.map(c=>{ const n=Object.keys(tcPlayersCache[c]||{}).length;
+      return '<button class="hand-code'+(fol.includes(c)?' on':'')+'" onclick="toggleHandCode(\''+c+'\')" title="'+(fol.includes(c)?'Skjul':'Vis')+' elevene med denne koden">'+c+' <span style="font-weight:700;opacity:.7">('+n+')</span></button>'; }).join(''):'';
 }
 
 function checkExistingTimecode(){
@@ -1569,13 +1583,15 @@ function listenHands(code){
 }
 function stopHands(code){ if(handUnsubs[code]){ handUnsubs[code](); delete handUnsubs[code]; } delete handsCache[code]; renderHands(); }
 // Hvilke timekoder køen følger: dine egne (laget på denne maskinen), ellers alle aktive
+let followSeen=new Set();
 function followed(){
   const active=Object.keys(activeCodes);
-  if(!handFollow){ const mine=mineKoder().filter(c=>active.includes(c)); handFollow=new Set(mine.length?mine:active); }
-  active.forEach(c=>{ if(!handFollow.has(c)&&mineKoder().includes(c)) handFollow.add(c); });
+  if(!handFollow){ const mine=mineKoder().filter(c=>active.includes(c)); handFollow=new Set(mine.length?mine:active); active.forEach(c=>followSeen.add(c)); }
+  // En timekode du nettopp har laget, vises automatisk første gang den dukker opp. Etterpå bestemmer du selv.
+  active.forEach(c=>{ if(!followSeen.has(c)){ followSeen.add(c); if(mineKoder().includes(c)) handFollow.add(c); } });
   return active.filter(c=>handFollow.has(c));
 }
-window.toggleHandCode=function(c){ followed(); handFollow.has(c)?handFollow.delete(c):handFollow.add(c); renderHands(); };
+window.toggleHandCode=function(c){ followed(); handFollow.has(c)?handFollow.delete(c):handFollow.add(c); renderHands(); mergeAndUpdateLiveGrid(); };
 function handLevelText(h){
   if(h.nivaa===undefined||h.nivaa===null) return '';
   const g=GAME_LEVELS[h.spill];

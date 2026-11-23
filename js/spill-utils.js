@@ -1,4 +1,4 @@
-// ── spill-utils.js v2.6 ──
+// ── spill-utils.js v2.7 ──
 // Felles hjelpefunksjoner for alle fagsider og spill.
 //
 // VIKTIG: Lastes i <head>, FØR spillets egen kode:
@@ -374,6 +374,35 @@ function addTidNotice(){
 }
 function suTidInit(){ try{ startTidMaling(); addTidNotice(); }catch(e){} }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',suTidInit); else suTidInit();
+
+// ── HOPPE OVER OPPGAVE ──
+// Å hoppe over koster poeng, så det ikke lønner seg å fiske etter enkle oppgaver.
+// Uten forsøk (eller etter én feil): halvparten av det oppgaven er verdt. Etter minst to feil: en fjerdedel.
+// Telles ikke som feil for nivået. Totalen går aldri under 0.
+// value: poengene et riktig svar ville gitt nå. wrongs: antall feil på oppgaven. opts.get/opts.set: spillets poengvariabel.
+function suSkip(value,wrongs,opts){
+  opts=opts||{};
+  const get=opts.get||(()=>window.currentScore||0), set=opts.set||(v=>{ window.currentScore=v; });
+  const pen=Math.max(1,Math.round((value||0)*((wrongs||0)>=2?0.25:0.5)));
+  const before=get(), after=Math.max(0,before-pen), lost=before-after;
+  if(!lost) return 0;
+  set(after);
+  const b=document.getElementById('scoreBadge'); if(b) b.textContent=after+' p';
+  const big=document.getElementById('myScoreBig'); if(big) big.textContent=after;
+  if(window._roomCode&&typeof syncRoomScore==='function') syncRoomScore(after);
+  if(typeof window.syncScore==='function'){ try{ window.syncScore(after); }catch(e){} }
+  const msg='⏭️ Hoppet over: −'+lost+' poeng';
+  if(document.getElementById('toast')&&typeof showToast==='function') showToast(msg,'error');
+  else { const t=document.createElement('div'); t.textContent=msg;
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;font-family:Nunito,system-ui,sans-serif;font-weight:900;padding:10px 20px;border-radius:10px;z-index:1100;box-shadow:0 6px 20px rgba(0,0,0,.2)';
+    document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
+  return lost;
+}
+// Merk hopp-over-knappene så eleven ser at det koster
+function suMarkSkipButtons(){
+  document.querySelectorAll('[data-su-skip]').forEach(b=>{ if(!b.dataset.suMarked){ b.dataset.suMarked='1'; b.title='Å hoppe over koster halvparten av poengene oppgaven er verdt (en fjerdedel hvis du har prøvd to ganger)'; b.insertAdjacentHTML('beforeend',' <small style="opacity:.8">(−p)</small>'); } });
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',suMarkSkipButtons); else suMarkSkipButtons();
 
 // ── REKK OPP HÅNDA ──
 // Lagres under timecodes/KODE/hender/NAVN = {ts, nick, spill, tittel, nivaa, sett, valg, tekst}
